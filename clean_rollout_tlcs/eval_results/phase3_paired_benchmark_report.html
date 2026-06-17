@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TLCS Phase 3 Paired Benchmark Report</title>
+<style>
+:root { color-scheme: light; --ink:#1f2937; --muted:#667085; --line:#d0d5dd; --bg:#f6f7f9; --panel:#fff; --accent:#0f766e; --accent2:#b42318; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Segoe UI, Arial, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.5; }
+header { background: #102a43; color: white; padding: 34px 44px 28px; }
+h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: 0; }
+header p { margin: 0; max-width: 980px; color: #d9e2ec; }
+main { max-width: 1220px; margin: 0 auto; padding: 28px 24px 48px; }
+section { margin: 0 0 28px; }
+h2 { font-size: 20px; margin: 0 0 12px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.kpi .label { color: var(--muted); font-size: 13px; }
+.kpi .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+.note { background: #fff8e6; border: 1px solid #fedf89; border-radius: 8px; padding: 12px 14px; color: #533c00; }
+table { border-collapse: collapse; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+th, td { padding: 9px 10px; border-bottom: 1px solid #eaecf0; text-align: right; font-size: 13px; white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+th { background: #eef2f6; font-weight: 700; color: #344054; }
+tr:last-child td { border-bottom: none; }
+.good { color: var(--accent); font-weight: 700; }
+.bad { color: var(--accent2); font-weight: 700; }
+.small { color: var(--muted); font-size: 13px; }
+@media (max-width: 760px) { header { padding: 26px 20px; } main { padding: 20px 12px 36px; } .grid { grid-template-columns: 1fr; } table { display:block; overflow-x:auto; } }
+</style>
+</head>
+<body>
+<header>
+<h1>TLCS Phase 3 Paired Benchmark Report</h1>
+<p>?? 3 ? independently trained DQN models?? 30 ? disjoint evaluation traffic seeds ??? fixed_time?greedy?dqn?rollout_1s?rollout_ms??????? paired comparison???? model_run + traffic seed ????????</p>
+</header>
+<main>
+<section class="grid">
+<div class="kpi"><div class="label">Rows</div><div class="value">450</div><div class="small">3 models ? 30 traffic seeds ? 5 modes</div></div>
+<div class="kpi"><div class="label">Best Mean Wait</div><div class="value">rollout_ms</div><div class="small">10,084.1 veh-sec</div></div>
+<div class="kpi"><div class="label">Best Avg Queue</div><div class="value">rollout_ms</div><div class="small">1.867 vehicles</div></div>
+</section>
+<section class="note">Pairing check: passed??? model_run + seed ?????? 5 ? mode: True??? route_hash ????: True?</section>
+<section>
+<h2>Overall Means</h2>
+<table><thead><tr><th>mode</th><th>n</th><th>wait mean</th><th>wait std</th><th>avg queue</th><th>stage cost g</th><th>fuel mean</th><th>CO2 mean</th><th>f MAE</th><th>f Spearman</th></tr></thead><tbody><tr><td>fixed_time</td><td>90</td><td>17,776.9</td><td>566.4</td><td>3.292</td><td>-14,521.6</td><td>48,086,311.1</td><td>148,326,997.8</td><td></td><td></td></tr><tr><td>greedy</td><td>90</td><td>11,601.4</td><td>874.6</td><td>2.148</td><td>-9,422.6</td><td>44,739,237.6</td><td>138,002,686.3</td><td></td><td></td></tr><tr><td>dqn</td><td>90</td><td>10,211.8</td><td>640.8</td><td>1.891</td><td>-8,111.7</td><td>44,064,839.1</td><td>135,922,462.9</td><td></td><td></td></tr><tr><td>rollout_1s</td><td>90</td><td>10,273.2</td><td>656.7</td><td>1.902</td><td>-8,205.3</td><td>44,080,717.7</td><td>135,971,438.8</td><td>0.2335</td><td>0.5422</td></tr><tr><td class="good">rollout_ms</td><td>90</td><td class="good">10,084.1</td><td>650.9</td><td class="good">1.867</td><td class="good">-8,016.9</td><td>43,976,613.5</td><td>135,650,320.5</td><td>0.2367</td><td>0.5361</td></tr></tbody></table>
+<p class="small">Lower is better for wait, queue, fuel, CO2. Higher / less negative is better for stage cost g.</p>
+</section>
+<section>
+<h2>Paired Improvements</h2>
+<table><thead><tr><th>baseline</th><th>mode</th><th>n</th><th>wait improvement</th><th>95% CI</th><th>wait reduction</th><th>queue improvement</th><th>stage cost gain</th><th>win rate</th></tr></thead><tbody><tr><td>fixed_time</td><td>fixed_time</td><td>90</td><td>0.0</td><td>? 0.0</td><td>0.00%</td><td>0.0000</td><td>0.0</td><td class="bad">0.00%</td></tr><tr><td>fixed_time</td><td>greedy</td><td>90</td><td class="good">6,175.5</td><td>? 179.9</td><td class="good">34.72%</td><td class="good">1.1436</td><td class="good">5,099.0</td><td class="good">100.00%</td></tr><tr><td>fixed_time</td><td>dqn</td><td>90</td><td class="good">7,565.1</td><td>? 149.7</td><td class="good">42.53%</td><td class="good">1.4009</td><td class="good">6,409.9</td><td class="good">100.00%</td></tr><tr><td>fixed_time</td><td>rollout_1s</td><td>90</td><td class="good">7,503.7</td><td>? 152.9</td><td class="good">42.18%</td><td class="good">1.3896</td><td class="good">6,316.2</td><td class="good">100.00%</td></tr><tr><td>fixed_time</td><td>rollout_ms</td><td>90</td><td class="good">7,692.8</td><td>? 133.5</td><td class="good">43.27%</td><td class="good">1.4246</td><td class="good">6,504.7</td><td class="good">100.00%</td></tr><tr><td>dqn</td><td>fixed_time</td><td>90</td><td class="bad">-7,565.1</td><td>? 149.7</td><td class="bad">-74.66%</td><td class="bad">-1.4009</td><td class="bad">-6,409.9</td><td class="bad">0.00%</td></tr><tr><td>dqn</td><td>greedy</td><td>90</td><td class="bad">-1,389.6</td><td>? 136.6</td><td class="bad">-13.70%</td><td class="bad">-0.2573</td><td class="bad">-1,310.8</td><td class="bad">1.11%</td></tr><tr><td>dqn</td><td>dqn</td><td>90</td><td>0.0</td><td>? 0.0</td><td>0.00%</td><td>0.0000</td><td>0.0</td><td class="bad">0.00%</td></tr><tr><td>dqn</td><td>rollout_1s</td><td>90</td><td class="bad">-61.4</td><td>? 117.9</td><td class="bad">-0.75%</td><td class="bad">-0.0114</td><td class="bad">-93.6</td><td class="bad">47.78%</td></tr><tr><td>dqn</td><td>rollout_ms</td><td>90</td><td class="good">127.7</td><td>? 113.7</td><td class="good">1.12%</td><td class="good">0.0237</td><td class="good">94.8</td><td class="good">64.44%</td></tr></tbody></table>
+<p class="small">wait improvement = baseline wait - mode wait????? mode ?? baseline?CI ? mean paired wait improvement ??? 95% CI?</p>
+</section>
+<section>
+<h2>Per-Model Robustness</h2>
+<table><thead><tr><th>model</th><th>mode</th><th>mean wait</th><th>mean queue</th><th>mean stage cost g</th></tr></thead><tbody><tr><td>seed_0</td><td>fixed_time</td><td>17,776.9</td><td>3.292</td><td>-14,521.6</td></tr><tr><td>seed_0</td><td>greedy</td><td>11,601.4</td><td>2.148</td><td>-9,422.6</td></tr><tr><td>seed_0</td><td>dqn</td><td>10,192.0</td><td>1.887</td><td>-8,109.3</td></tr><tr><td>seed_0</td><td>rollout_1s</td><td>10,138.8</td><td>1.878</td><td>-8,082.5</td></tr><tr><td>seed_0</td><td>rollout_ms</td><td>10,225.7</td><td>1.894</td><td>-8,173.5</td></tr><tr><td>seed_1</td><td>fixed_time</td><td>17,776.9</td><td>3.292</td><td>-14,521.6</td></tr><tr><td>seed_1</td><td>greedy</td><td>11,601.4</td><td>2.148</td><td>-9,422.6</td></tr><tr><td>seed_1</td><td>dqn</td><td>10,204.8</td><td>1.890</td><td>-8,073.8</td></tr><tr><td>seed_1</td><td>rollout_1s</td><td>10,392.7</td><td>1.925</td><td>-8,327.7</td></tr><tr><td>seed_1</td><td>rollout_ms</td><td>9,988.4</td><td>1.850</td><td>-7,908.2</td></tr><tr><td>seed_2</td><td>fixed_time</td><td>17,776.9</td><td>3.292</td><td>-14,521.6</td></tr><tr><td>seed_2</td><td>greedy</td><td>11,601.4</td><td>2.148</td><td>-9,422.6</td></tr><tr><td>seed_2</td><td>dqn</td><td>10,238.5</td><td>1.896</td><td>-8,152.1</td></tr><tr><td>seed_2</td><td>rollout_1s</td><td>10,288.0</td><td>1.905</td><td>-8,205.9</td></tr><tr><td>seed_2</td><td>rollout_ms</td><td>10,038.1</td><td>1.859</td><td>-7,969.0</td></tr></tbody></table>
+</section>
+<section>
+<h2>Source Files</h2>
+<ul><li>paired_benchmarks_seed0.csv</li><li>paired_benchmarks_seed1.csv</li><li>paired_benchmarks_seed2.csv</li></ul>
+<p class="small">Merged CSV written to clean_rollout_tlcs\eval_results\paired_benchmarks_merged.csv.</p>
+</section>
+</main>
+</body>
+</html>

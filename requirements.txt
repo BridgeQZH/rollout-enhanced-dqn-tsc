@@ -1,0 +1,20 @@
+# Runtime dependencies for the rollout-enhanced TLCS project.
+# Pinned to the versions the frozen results were produced with.
+#
+#   python -m venv .venv
+#   .venv\Scripts\activate        (Windows)   |   source .venv/bin/activate  (POSIX)
+#   pip install -r requirements.txt
+#   pip install -e .              (makes `clean_rollout_tlcs` importable anywhere)
+#
+# NOTE: SUMO itself is a SYSTEM dependency, not a pip package. Install SUMO
+# separately and set SUMO_HOME (see README "Installation"). `traci`/`sumolib`
+# below are the Python bindings only.
+
+torch==2.9.0            # CPU build used for results; for CUDA use the appropriate extra-index-url
+numpy==2.3.4
+pydantic==2.12.4
+PyYAML==6.0.3
+matplotlib==3.10.7      # training curves, deck figures, live telemetry window
+PyQt6==6.7.1            # Robust interactive GUI backend (fixes broken Windows Tcl/Tk issue)
+traci==1.24.0           # SUMO Python control bindings
+sumolib==1.24.0         # SUMO network/utility bindings

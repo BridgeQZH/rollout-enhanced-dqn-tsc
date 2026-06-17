@@ -1,0 +1,64 @@
+{
+  "generated_utc": "2026-06-16T12:44:50.512374+00:00",
+  "base_settings": "model_long/seed_0/training_settings.yaml",
+  "demands": [
+    1000,
+    1500,
+    2000
+  ],
+  "max_steps_override": null,
+  "eval_seed_start": 100000,
+  "n_eval_seeds": 30,
+  "model_runs": [
+    "model_long/seed_0",
+    "model_long/seed_1"
+  ],
+  "out_root": "eval_results_stress",
+  "frozen_csv_metrics": [
+    "total_wait_vehsec",
+    "avg_queue",
+    "total_stage_cost_g",
+    "total_fuel",
+    "total_co2",
+    "f_mae",
+    "f_spearman"
+  ],
+  "metrics_missing_from_frozen_schema": [
+    "throughput",
+    "residual_vehicles"
+  ],
+  "levels": [
+    {
+      "demand": 1000,
+      "settings_path": "eval_results_stress/D_1000/settings_D1000.yaml",
+      "commands": [
+        "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1000/settings_D1000.yaml --model-dir model_long/seed_0 --out eval_results_stress/D_1000/seed_0/paired_benchmarks.csv",
+        "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1000/settings_D1000.yaml --model-dir model_long/seed_1 --out eval_results_stress/D_1000/seed_1/paired_benchmarks.csv"
+      ]
+    },
+    {
+      "demand": 1500,
+      "settings_path": "eval_results_stress/D_1500/settings_D1500.yaml",
+      "commands": [
+        "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1500/settings_D1500.yaml --model-dir model_long/seed_0 --out eval_results_stress/D_1500/seed_0/paired_benchmarks.csv",
+        "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1500/settings_D1500.yaml --model-dir model_long/seed_1 --out eval_results_stress/D_1500/seed_1/paired_benchmarks.csv"
+      ]
+    },
+    {
+      "demand": 2000,
+      "settings_path": "eval_results_stress/D_2000/settings_D2000.yaml",
+      "commands": [
+        "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_2000/settings_D2000.yaml --model-dir model_long/seed_0 --out eval_results_stress/D_2000/seed_0/paired_benchmarks.csv",
+        "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_2000/settings_D2000.yaml --model-dir model_long/seed_1 --out eval_results_stress/D_2000/seed_1/paired_benchmarks.csv"
+      ]
+    }
+  ],
+  "commands": [
+    "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1000/settings_D1000.yaml --model-dir model_long/seed_0 --out eval_results_stress/D_1000/seed_0/paired_benchmarks.csv",
+    "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1000/settings_D1000.yaml --model-dir model_long/seed_1 --out eval_results_stress/D_1000/seed_1/paired_benchmarks.csv",
+    "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1500/settings_D1500.yaml --model-dir model_long/seed_0 --out eval_results_stress/D_1500/seed_0/paired_benchmarks.csv",
+    "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_1500/settings_D1500.yaml --model-dir model_long/seed_1 --out eval_results_stress/D_1500/seed_1/paired_benchmarks.csv",
+    "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_2000/settings_D2000.yaml --model-dir model_long/seed_0 --out eval_results_stress/D_2000/seed_0/paired_benchmarks.csv",
+    "python -m clean_rollout_tlcs.eval --settings eval_results_stress/D_2000/settings_D2000.yaml --model-dir model_long/seed_1 --out eval_results_stress/D_2000/seed_1/paired_benchmarks.csv"
+  ]
+}

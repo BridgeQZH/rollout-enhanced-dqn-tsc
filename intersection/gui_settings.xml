@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SUMO-GUI view settings for the D=2000 comparison recording.
+     Loaded via run_gui_demo.py (--gui-settings) or manually in the GUI:
+       File > Settings... or pass on the sumo-gui command line.
+     Delay can be overridden on the command line with --delay <ms>.
+     To color vehicles by waiting time (recommended for the demo), open
+       View Settings > Vehicles > Color by: "waiting time"  (see the guide). -->
+<viewsettings>
+    <scheme name="real world"/>
+    <delay value="120"/>
+    <viewport zoom="800" x="0" y="0" angle="0"/>
+</viewsettings>

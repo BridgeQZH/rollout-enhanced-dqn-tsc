@@ -1,0 +1,44 @@
+{
+  "metric": "total_wait_vehsec",
+  "n_pairs": 90,
+  "win_rate_pct": 64.44444444444444,
+  "mean_paired_reduction_pct": 1.1164380037014292,
+  "median_paired_diff_vehsec": 229.0,
+  "median_diff_ci95": [
+    65.0,
+    339.0
+  ],
+  "wilcoxon": {
+    "p_value": 0.018882799951203566,
+    "z": 2.347836660468265,
+    "w_plus": 2631.5,
+    "w_minus": 1463.5,
+    "effect_size": 0.2852258852258852,
+    "n_nonzero": 90
+  },
+  "f_fidelity": {
+    "mean_f_mae": 0.23513880992221287,
+    "mean_f_spearman": 0.53916509469912,
+    "per_mode": {
+      "rollout_1s": {
+        "f_mae": 0.23354558720163088,
+        "f_spearman": 0.5422139473594696
+      },
+      "rollout_ms": {
+        "f_mae": 0.2367320326427949,
+        "f_spearman": 0.5361162420387704
+      }
+    },
+    "n": 180
+  },
+  "latency": {
+    "available": true,
+    "device": "cpu",
+    "n_calls": 2000,
+    "depth": 3,
+    "dqn_ms": 0.4288587000046391,
+    "rollout_1s_ms": 1.8639628999953857,
+    "rollout_ms_ms": 4.072384450002573,
+    "ratio_ms_over_dqn": 9.495865304722793
+  }
+}
