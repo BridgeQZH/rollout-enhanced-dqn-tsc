@@ -48,7 +48,7 @@ import traci
 from numpy.typing import NDArray
 
 from .agent import DQNAgent
-from .constants import INCOMING_EDGES, MODEL_FILE, NUM_ACTIONS, ROUTES_FILE, STATE_SIZE
+from .constants import MODEL_FILE, NUM_ACTIONS, ROUTES_FILE, STATE_SIZE
 from .env import Environment, EnvStats
 from .model import Model
 from .settings import ControlMode, Settings, load_settings
@@ -156,7 +156,7 @@ class EvalEnvironment(Environment):
         if not self.emissions_available:
             return
         try:
-            for edge in INCOMING_EDGES:
+            for edge in self.spec.incoming_edges:
                 self.fuel_total += float(traci.edge.getFuelConsumption(edge))
                 self.co2_total += float(traci.edge.getCO2Emission(edge))
         except (traci.TraCIException, AttributeError):  # pragma: no cover - build-dependent

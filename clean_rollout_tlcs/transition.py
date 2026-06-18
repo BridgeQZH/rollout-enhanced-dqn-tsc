@@ -25,13 +25,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from .constants import (
-    LANE_QUEUE_CAPACITY,
-    LANES_PER_GROUP,
-    NUM_ACTIONS,
-    SERVICE_INDICATOR,
-    STATE_SIZE,
-)
+from .intersection_spec import IntersectionSpec, build_single_intersection_spec
 from .settings import Settings
 
 
@@ -94,6 +88,7 @@ class TransitionModel:
         yellow_duration: int,
         saturation_flow: float,
         startup_lost_time: float,
+        spec: IntersectionSpec | None = None,
         capacity: NDArray | None = None,
     ) -> None:
         """Initialize the transition model with its physical constants.
@@ -103,29 +98,35 @@ class TransitionModel:
             yellow_duration: Yellow hold time (s) inserted on a phase change.
             saturation_flow: Saturation discharge rate per physical lane (veh/s).
             startup_lost_time: Lost time at green onset (s) charged on a switch.
+            spec: Structural description of the junction whose physics this model
+                predicts; defaults to the canonical single intersection.
             capacity: Optional per-state-index queue capacity ``C_i``; defaults to
-                ``LANE_QUEUE_CAPACITY`` from the network geometry.
+                the spec's ``lane_queue_capacity`` (from the network geometry).
         """
         self.green_duration = green_duration
         self.yellow_duration = yellow_duration
         self.saturation_flow = saturation_flow
         self.startup_lost_time = startup_lost_time
 
-        self._lanes_per_group = np.asarray(LANES_PER_GROUP, dtype=float)
+        self.spec = spec if spec is not None else build_single_intersection_spec()
+        self._num_actions = self.spec.num_actions
+        self._state_size = self.spec.state_size
+        self._lanes_per_group = np.asarray(self.spec.lanes_per_group, dtype=float)
         self._capacity = (
             np.asarray(capacity, dtype=float)
             if capacity is not None
-            else np.asarray(LANE_QUEUE_CAPACITY, dtype=float)
+            else np.asarray(self.spec.lane_queue_capacity, dtype=float)
         )
-        # Precompute the 4x12 service-indicator matrix once.
-        self._service = np.asarray(SERVICE_INDICATOR, dtype=float)
+        # Precompute the (num_actions x state_size) service-indicator matrix once.
+        self._service = self.spec.service_matrix()
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> TransitionModel:
+    def from_settings(cls, settings: Settings, spec: IntersectionSpec | None = None) -> TransitionModel:
         """Build a :class:`TransitionModel` from a validated :class:`Settings`.
 
         Args:
             settings: Validated configuration.
+            spec: Junction structure; defaults to the canonical single intersection.
 
         Returns:
             A configured transition model.
@@ -135,6 +136,7 @@ class TransitionModel:
             yellow_duration=settings.yellow_duration,
             saturation_flow=settings.saturation_flow,
             startup_lost_time=settings.startup_lost_time,
+            spec=spec,
         )
 
     def f(
@@ -160,15 +162,15 @@ class TransitionModel:
         Raises:
             ValueError: If ``action`` is invalid or the input shapes are wrong.
         """
-        if not 0 <= action < NUM_ACTIONS:
-            msg = f"action must be in [0, {NUM_ACTIONS}); got {action}"
+        if not 0 <= action < self._num_actions:
+            msg = f"action must be in [0, {self._num_actions}); got {action}"
             raise ValueError(msg)
 
         x = np.asarray(state, dtype=float)
         rates = np.asarray(arrival_rates, dtype=float)
-        if x.shape != (STATE_SIZE,) or rates.shape != (STATE_SIZE,):
+        if x.shape != (self._state_size,) or rates.shape != (self._state_size,):
             msg = (
-                f"state and arrival_rates must both have shape ({STATE_SIZE},); "
+                f"state and arrival_rates must both have shape ({self._state_size},); "
                 f"got {x.shape} and {rates.shape}"
             )
             raise ValueError(msg)

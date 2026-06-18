@@ -26,24 +26,14 @@ from numpy.typing import NDArray
 from sumolib import checkBinary
 
 from .constants import (
-    ACTION_TO_TL_PHASE,
     DEFAULT_DEPART_SPEED,
-    DETECTOR_DISTANCE_M,
-    INCOMING_EDGES,
-    LANE_ID_TO_STATE_INDEX,
-    NUM_ACTIONS,
-    ROAD_MAX_LENGTH,
     ROUTES_FILE,
     ROUTES_FILE_HEADER,
-    SERVED_LANES,
-    STATE_SIZE,
-    STOPLINE_ZONE_M,
     STRAIGHT_ROUTES,
-    TL_GREEN_TO_YELLOW,
-    TRAFFIC_LIGHT_ID,
     TURN_ROUTES,
     WEIBULL_SHAPE,
 )
+from .intersection_spec import IntersectionSpec, build_single_intersection_spec
 from .settings import CostType, Settings
 
 
@@ -77,6 +67,7 @@ class Environment:
         cost_quadratic_kappa: float,
         detector_window: int,
         detector_lag_tau: float,
+        spec: IntersectionSpec | None = None,
     ) -> None:
         """Initialize the environment.
 
@@ -94,6 +85,8 @@ class Environment:
             cost_quadratic_kappa: Normalizer for the quadratic cost variant.
             detector_window: Sliding-window length (s) for the arrival estimator.
             detector_lag_tau: Detector->stop-line travel-time lag (s).
+            spec: Structural description of the controlled junction; defaults to
+                the canonical single intersection.
         """
         self.n_cars_generated = n_cars_generated
         self.max_steps = max_steps
@@ -111,20 +104,23 @@ class Environment:
         self.detector_window = detector_window
         self.detector_lag_tau = detector_lag_tau
 
+        self.spec = spec if spec is not None else build_single_intersection_spec()
+
         self.step = 0
 
         # Per-step arrival counts registered by the virtual upstream detector,
         # one list per state index; index t holds detections during step t.
-        self._arrival_history: dict[int, list[int]] = {i: [] for i in range(STATE_SIZE)}
+        self._arrival_history: dict[int, list[int]] = {i: [] for i in range(self.spec.state_size)}
         # Vehicle ids already registered by the detector (count each vehicle once).
         self._detected_ids: set[str] = set()
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> Environment:
+    def from_settings(cls, settings: Settings, spec: IntersectionSpec | None = None) -> Environment:
         """Build an :class:`Environment` from a validated :class:`Settings`.
 
         Args:
             settings: Validated configuration.
+            spec: Junction structure; defaults to the canonical single intersection.
 
         Returns:
             A configured environment instance.
@@ -143,6 +139,7 @@ class Environment:
             cost_quadratic_kappa=settings.cost_quadratic_kappa,
             detector_window=settings.detector_window,
             detector_lag_tau=settings.detector_lag_tau,
+            spec=spec,
         )
 
     # ------------------------------------------------------------------ #
@@ -176,7 +173,7 @@ class Environment:
     def reset(self) -> None:
         """Reset per-episode counters and the detector history buffers."""
         self.step = 0
-        self._arrival_history = {i: [] for i in range(STATE_SIZE)}
+        self._arrival_history = {i: [] for i in range(self.spec.state_size)}
         self._detected_ids = set()
 
     def activate(self) -> None:
@@ -243,18 +240,15 @@ class Environment:
         Returns:
             A float array of shape ``(STATE_SIZE,)`` of non-negative counts.
         """
-        state = np.zeros(STATE_SIZE, dtype=float)
-
-        for car_id in traci.vehicle.getIDList():
-            group = LANE_ID_TO_STATE_INDEX.get(traci.vehicle.getLaneID(car_id))
-            if group is None:
-                continue  # not on a tracked incoming lane (e.g. inside junction)
-
-            dist_to_tl = ROAD_MAX_LENGTH - float(traci.vehicle.getLanePosition(car_id))
-            if dist_to_tl <= STOPLINE_ZONE_M:
-                state[group] += 1.0
-
-        return state
+        road_max_length = self.spec.road_max_length
+        vehicles = (
+            (
+                traci.vehicle.getLaneID(car_id),
+                road_max_length - float(traci.vehicle.getLanePosition(car_id)),
+            )
+            for car_id in traci.vehicle.getIDList()
+        )
+        return self.spec.count_state(vehicles)
 
     # ------------------------------------------------------------------ #
     # Stage cost  g(x, u, u_prev)
@@ -286,21 +280,22 @@ class Environment:
         Raises:
             ValueError: If ``action`` is outside the valid action range.
         """
-        if not 0 <= action < NUM_ACTIONS:
-            msg = f"action must be in [0, {NUM_ACTIONS}); got {action}"
+        if not 0 <= action < self.spec.num_actions:
+            msg = f"action must be in [0, {self.spec.num_actions}); got {action}"
             raise ValueError(msg)
 
         switched = prev_action != -1 and action != prev_action
         delta = self.green_duration + (self.yellow_duration if switched else 0)
 
-        served = SERVED_LANES[action]
+        state_size = self.spec.state_size
+        served = self.spec.served_lanes[action]
         if self.cost_type == "linear":
             per_second_cost = float(
-                sum(state[i] for i in range(STATE_SIZE) if i not in served),
+                sum(state[i] for i in range(state_size) if i not in served),
             )
         else:  # quadratic fairness variant
             per_second_cost = (
-                float(sum(state[i] ** 2 for i in range(STATE_SIZE) if i not in served))
+                float(sum(state[i] ** 2 for i in range(state_size) if i not in served))
                 / self.cost_quadratic_kappa
             )
 
@@ -333,20 +328,23 @@ class Environment:
         the arm). The per-group counts are appended to the rolling history so that
         :meth:`get_arrival_rates` can apply the travel-time lag.
         """
-        counts = [0] * STATE_SIZE
+        counts = [0] * self.spec.state_size
+        lane_to_index = self.spec.lane_id_to_state_index
+        road_max_length = self.spec.road_max_length
+        detector_distance = self.spec.detector_distance_m
 
         for car_id in traci.vehicle.getIDList():
             if car_id in self._detected_ids:
                 continue
-            group = LANE_ID_TO_STATE_INDEX.get(traci.vehicle.getLaneID(car_id))
+            group = lane_to_index.get(traci.vehicle.getLaneID(car_id))
             if group is None:
                 continue
-            dist_to_tl = ROAD_MAX_LENGTH - float(traci.vehicle.getLanePosition(car_id))
-            if dist_to_tl >= DETECTOR_DISTANCE_M:
+            dist_to_tl = road_max_length - float(traci.vehicle.getLanePosition(car_id))
+            if dist_to_tl >= detector_distance:
                 counts[group] += 1
                 self._detected_ids.add(car_id)
 
-        for group in range(STATE_SIZE):
+        for group in range(self.spec.state_size):
             self._arrival_history[group].append(counts[group])
 
     def get_arrival_rates(self) -> NDArray:
@@ -362,7 +360,7 @@ class Environment:
             A float array of shape ``(STATE_SIZE,)`` of arrival rates (veh/s).
             Lane groups with insufficient lagged history return ``0.0``.
         """
-        rates = np.zeros(STATE_SIZE, dtype=float)
+        rates = np.zeros(self.spec.state_size, dtype=float)
 
         lag_steps = int(round(self.detector_lag_tau))
         window_end = self.step - lag_steps
@@ -372,7 +370,7 @@ class Environment:
         if span <= 0:
             return rates  # not enough history behind the lag yet
 
-        for group in range(STATE_SIZE):
+        for group in range(self.spec.state_size):
             history = self._arrival_history[group]
             # Guard against window_end exceeding the recorded history length.
             end = min(window_end, len(history))
@@ -400,8 +398,8 @@ class Environment:
         Returns:
             Per-step statistics gathered while the phases were held.
         """
-        next_green_phase = ACTION_TO_TL_PHASE[action]
-        current_green_phase = traci.trafficlight.getPhase(TRAFFIC_LIGHT_ID)
+        next_green_phase = self.spec.action_to_phase[action]
+        current_green_phase = traci.trafficlight.getPhase(self.spec.tl_id)
 
         stats: list[EnvStats] = []
 
@@ -443,7 +441,7 @@ class Environment:
         Args:
             current_green_phase: Code of the currently active green phase.
         """
-        traci.trafficlight.setPhase(TRAFFIC_LIGHT_ID, TL_GREEN_TO_YELLOW[current_green_phase])
+        traci.trafficlight.setPhase(self.spec.tl_id, self.spec.green_to_yellow[current_green_phase])
 
     def _set_green_phase(self, green_phase_code: int) -> None:
         """Switch the traffic light to the given green phase.
@@ -451,7 +449,7 @@ class Environment:
         Args:
             green_phase_code: Code of the green phase to activate.
         """
-        traci.trafficlight.setPhase(TRAFFIC_LIGHT_ID, green_phase_code)
+        traci.trafficlight.setPhase(self.spec.tl_id, green_phase_code)
 
     # ------------------------------------------------------------------ #
     # Metrics
@@ -463,7 +461,7 @@ class Environment:
             Total count of vehicles with speed 0 across the four incoming edges.
         """
         return int(
-            sum(traci.edge.getLastStepHaltingNumber(edge) for edge in INCOMING_EDGES),
+            sum(traci.edge.getLastStepHaltingNumber(edge) for edge in self.spec.incoming_edges),
         )
 
     def get_cumulated_waiting_time(self) -> float:
@@ -473,7 +471,8 @@ class Environment:
             Total accumulated waiting time (s) of all vehicles on incoming edges.
         """
         total = 0.0
+        incoming_edges = self.spec.incoming_edges
         for car_id in traci.vehicle.getIDList():
-            if traci.vehicle.getRoadID(car_id) in INCOMING_EDGES:
+            if traci.vehicle.getRoadID(car_id) in incoming_edges:
                 total += float(traci.vehicle.getAccumulatedWaitingTime(car_id))
         return total
