@@ -81,11 +81,11 @@ def _ref_stage_cost(
 
 def _ref_count_state(vehicles: list[tuple[str, float]]) -> NDArray:
     state = np.zeros(C.STATE_SIZE, dtype=float)
-    for lane_id, dist in vehicles:
+    for lane_id, position in vehicles:
         group = C.LANE_ID_TO_STATE_INDEX.get(lane_id)
         if group is None:
             continue
-        if dist <= C.STOPLINE_ZONE_M:
+        if (C.ROAD_MAX_LENGTH - position) <= C.STOPLINE_ZONE_M:  # uniform 750 m arms
             state[group] += 1.0
     return state
 
@@ -151,7 +151,7 @@ def test_count_state_matches_reference() -> None:
             (str(_RNG.choice(lane_ids)), float(_RNG.uniform(0, C.ROAD_MAX_LENGTH)))
             for _ in range(n)
         ]
-        got = spec.count_state(vehicles)
+        got = spec.count_state(vehicles)  # second element is now lane position
         ref = _ref_count_state(vehicles)
         assert np.array_equal(got, ref), "count_state deviates from reference"
 

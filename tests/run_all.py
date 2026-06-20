@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import argparse
 
-from tests import test_intersection_spec, test_single_agent_equivalence
+from tests import test_intersection_spec, test_net_parser, test_single_agent_equivalence
 
 # Fast, SUMO-free modules always run.
-_FAST_MODULES = (test_intersection_spec, test_single_agent_equivalence)
+_FAST_MODULES = (test_intersection_spec, test_single_agent_equivalence, test_net_parser)
 
 
 def main() -> int:

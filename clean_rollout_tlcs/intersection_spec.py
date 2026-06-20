@@ -62,11 +62,16 @@ class IntersectionSpec:
         incoming_edges: Incoming edge ids (queue / waiting-time bookkeeping).
         action_to_phase: Map from action index to SUMO green-phase code.
         green_to_yellow: Map from green-phase code to its matching yellow code.
-        road_max_length: Incoming-arm length (m); stop-line distance reference.
+        road_max_length: Reference incoming-arm length (m); used as the fallback
+            stop-line distance reference for any lane absent from ``lane_length``.
         stopline_zone_m: Distance-to-junction (m) within which a vehicle counts
             into the state vector.
         detector_distance_m: Distance-to-junction (m) of the virtual upstream
-            loop detector that feeds the arrival-rate estimator.
+            loop detector that feeds the arrival-rate estimator. On a grid this is
+            clamped by the parser so it always fits inside the shortest link.
+        lane_length: Per-incoming-lane length (m). On a uniform single junction
+            every entry equals ``road_max_length``; on a grid the lengths differ
+            per approach, which is why stop-line distance is computed per lane.
     """
 
     tl_id: str
@@ -82,6 +87,7 @@ class IntersectionSpec:
     road_max_length: float
     stopline_zone_m: float
     detector_distance_m: float
+    lane_length: Mapping[str, float] = field(default_factory=dict)
 
     # Cached derived structure (populated in __post_init__; not init args).
     _service_matrix: NDArray = field(default=None, init=False, repr=False, compare=False)  # type: ignore[assignment]
@@ -147,25 +153,54 @@ class IntersectionSpec:
         """Service matrix as a nested int tuple (legacy-compatible view)."""
         return tuple(tuple(int(v) for v in row) for row in self._service_matrix)
 
+    def lane_distance_to_stopline(self, lane_id: str, lane_position: float) -> float:
+        """Distance (m) from a vehicle to the stop line on its incoming lane.
+
+        Uses the per-lane length so short grid links and long single-junction arms
+        are handled by the same formula.
+
+        Args:
+            lane_id: Incoming lane id the vehicle is on.
+            lane_position: Vehicle position along the lane from its start (m).
+
+        Returns:
+            Metres remaining to the stop line at the junction.
+        """
+        length = self.lane_length.get(lane_id, self.road_max_length)
+        return length - lane_position
+
     def count_state(self, vehicles: Iterable[tuple[str, float]]) -> NDArray:
         """Count vehicles into the lane-count state vector (pure, SUMO-free).
 
         Args:
-            vehicles: Iterable of ``(lane_id, dist_to_tl)`` pairs, where
-                ``dist_to_tl`` is the vehicle's distance to the stop line (m).
+            vehicles: Iterable of ``(lane_id, lane_position)`` pairs, where
+                ``lane_position`` is the vehicle's position along its lane (m).
 
         Returns:
             A float array of shape ``(state_size,)`` counting vehicles that lie on
             a tracked incoming lane within ``stopline_zone_m`` of the junction.
         """
         state = np.zeros(self.state_size, dtype=float)
-        for lane_id, dist_to_tl in vehicles:
+        for lane_id, lane_position in vehicles:
             group = self.lane_id_to_state_index.get(lane_id)
             if group is None:
                 continue
-            if dist_to_tl <= self.stopline_zone_m:
+            if self.lane_distance_to_stopline(lane_id, lane_position) <= self.stopline_zone_m:
                 state[group] += 1.0
         return state
+
+    def detector_lag_tau(self, v_free: float) -> float:
+        """Travel-time lag ``tau = detector_distance / v_free`` for this junction.
+
+        Args:
+            v_free: Free-flow speed on the incoming arms (m/s).
+
+        Returns:
+            The detector->stop-line travel-time lag (s). Because the parser clamps
+            ``detector_distance_m`` to fit the shortest link, this stays finite and
+            small on short grid links instead of exceeding the link length.
+        """
+        return self.detector_distance_m / v_free
 
 
 def build_single_intersection_spec() -> IntersectionSpec:
@@ -193,4 +228,7 @@ def build_single_intersection_spec() -> IntersectionSpec:
         road_max_length=ROAD_MAX_LENGTH,
         stopline_zone_m=STOPLINE_ZONE_M,
         detector_distance_m=DETECTOR_DISTANCE_M,
+        # Every incoming arm of the canonical junction is the same length, so the
+        # per-lane map is uniform and reproduces the legacy scalar geometry.
+        lane_length={lane: ROAD_MAX_LENGTH for lane in LANE_ID_TO_STATE_INDEX},
     )

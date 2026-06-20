@@ -135,13 +135,10 @@ class EvalEnvironment(Environment):
             One :class:`EnvStats` per executed simulation step.
         """
         stats: list[EnvStats] = []
-        steps_todo = min(duration, self.max_steps - self.step)
 
-        for _ in range(steps_todo):
-            traci.simulationStep()
-            self.step += 1
-            self._record_detector()
-            stats.append(EnvStats(queue_length=self.get_queue_length()))
+        for _ in range(self.session.steps_remaining(duration)):
+            self.session.tick()
+            stats.append(self.junction.observe_step())
             self._accumulate_emissions()
             # Throughput accrues as vehicles reach their destination; the residual
             # (still running + waiting to be inserted) is overwritten each step so
