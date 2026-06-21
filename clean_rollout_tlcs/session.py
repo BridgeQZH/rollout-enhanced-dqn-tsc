@@ -18,6 +18,7 @@ an N-junction grid in Phase 2.3 — the only difference is how many
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import traci
@@ -32,6 +33,9 @@ from .constants import (
     WEIBULL_SHAPE,
 )
 
+if TYPE_CHECKING:
+    from .route_gen import RouteGenerator
+
 
 class SumoSession:
     """Owns the TraCI connection, the global clock and route generation."""
@@ -44,6 +48,7 @@ class SumoSession:
         max_steps: int,
         n_cars_generated: int,
         turn_chance: float,
+        route_generator: "RouteGenerator | None" = None,
     ) -> None:
         """Initialize the session.
 
@@ -53,12 +58,16 @@ class SumoSession:
             max_steps: Maximum number of simulation steps (seconds) per episode.
             n_cars_generated: Number of vehicles to spawn per episode.
             turn_chance: Probability a generated vehicle takes a turning route.
+            route_generator: Optional pluggable route generator (e.g. the grid OD
+                generator). When ``None``, the built-in single-intersection Weibull
+                pipeline is used unchanged.
         """
         self.sumocfg_file = sumocfg_file
         self.gui = gui
         self.max_steps = max_steps
         self.n_cars_generated = n_cars_generated
         self.turn_chance = turn_chance
+        self.route_generator = route_generator
 
         self.step = 0
 
@@ -146,6 +155,10 @@ class SumoSession:
             seed: Random seed; identical seeds yield identical traffic, which is
                 what makes the five-mode benchmark a paired comparison.
         """
+        if self.route_generator is not None:
+            self.route_generator.generate(seed)
+            return
+
         rng = np.random.default_rng(seed)
 
         timings = np.sort(rng.weibull(WEIBULL_SHAPE, self.n_cars_generated))

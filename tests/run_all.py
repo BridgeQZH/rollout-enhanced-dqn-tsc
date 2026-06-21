@@ -26,9 +26,11 @@ def main() -> int:
 
     modules = list(_FAST_MODULES)
     if not args.fast:
-        from tests import test_eval_regression  # imported lazily so --fast needs no SUMO
+        # Imported lazily so --fast needs no SUMO.
+        from tests import test_eval_regression, test_multi_agent
 
         modules.append(test_eval_regression)
+        modules.append(test_multi_agent)
 
     rc = 0
     for module in modules:

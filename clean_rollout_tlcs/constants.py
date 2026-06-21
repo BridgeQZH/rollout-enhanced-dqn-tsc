@@ -38,6 +38,13 @@ DEFAULT_TEST_FOLDER = "test"
 # Route file referenced by the SUMO ``.sumocfg``; regenerated each episode.
 ROUTES_FILE = Path("intersection/episode_routes.rou.xml")
 
+# 2x2 grid network assets (Phase 2.3 multi-agent). The route file is regenerated
+# per episode (gitignored); the net and sumocfg are committed.
+GRID2X2_DIR = Path("clean_rollout_tlcs/networks/grid2x2")
+GRID2X2_NET = GRID2X2_DIR / "grid2x2.net.xml"
+GRID2X2_SUMOCFG = GRID2X2_DIR / "grid2x2.sumocfg"
+GRID2X2_ROUTES = GRID2X2_DIR / "grid2x2_routes.rou.xml"
+
 # Header for the generated route file: one vehicle type plus all 12 OD routes.
 ROUTES_FILE_HEADER = """<routes>
     <vType accel="1.0" decel="4.5" id="standard_car" length="5.0" minGap="2.5" maxSpeed="25" sigma="0.5" />
