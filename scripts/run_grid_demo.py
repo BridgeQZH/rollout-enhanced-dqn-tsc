@@ -22,17 +22,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from clean_rollout_tlcs.model import Model
 from clean_rollout_tlcs.multi_agent import build_grid_runner
 from clean_rollout_tlcs.settings import load_settings
 
 DEFAULT_BASE_SETTINGS = Path("models") / "dqn_100ep" / "seed_0" / "training_settings.yaml"
+_MODEL_MODES = {"dqn", "rollout_1s", "rollout_ms"}
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    p = argparse.ArgumentParser(description="Run one 2x2-grid episode (model-free controller).")
-    p.add_argument("--mode", default="greedy", choices=["greedy", "fixed_time"],
-                   help="Model-free controller to drive every junction (default: greedy).")
+    p = argparse.ArgumentParser(description="Run one 2x2-grid episode.")
+    p.add_argument("--mode", default="greedy",
+                   choices=["greedy", "fixed_time", "dqn", "rollout_1s", "rollout_ms"],
+                   help="Controller to drive every junction (default: greedy).")
+    p.add_argument("--model-dir", type=Path, default=Path("models") / "grid2x2" / "seed_0",
+                   help="Run dir with trained_model.pt (for dqn / rollout_* modes).")
     p.add_argument("--base-settings", type=Path, default=DEFAULT_BASE_SETTINGS,
                    help="Base settings YAML to derive durations / cost / detector params from.")
     p.add_argument("--demand", type=int, default=600, help="n_cars_generated (default: 600).")
@@ -50,8 +55,17 @@ def main() -> int:
         update={"max_steps": args.max_steps, "n_cars_generated": args.demand, "gui": args.gui},
     )
 
+    model = None
+    if args.mode in _MODEL_MODES:
+        checkpoint = args.model_dir / "trained_model.pt"
+        if not checkpoint.exists():
+            print(f"[grid-demo] no checkpoint at {checkpoint}; train first: "
+                  f"python -m clean_rollout_tlcs.train_grid")
+            return 1
+        model = Model.load_checkpoint(checkpoint, learning_rate=settings.learning_rate)
+
     extra = ["--start", "true", "--delay", str(args.delay), "--quit-on-end", "true"] if args.gui else None
-    runner = build_grid_runner(settings, mode=args.mode, gui=args.gui, extra_sumo_args=extra)
+    runner = build_grid_runner(settings, mode=args.mode, gui=args.gui, model=model, extra_sumo_args=extra)
 
     print(f"[grid-demo] mode={args.mode} demand={args.demand} max_steps={args.max_steps} "
           f"seed={args.seed} gui={'on' if args.gui else 'off'}")

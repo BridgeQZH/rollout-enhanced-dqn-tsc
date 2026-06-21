@@ -24,13 +24,21 @@ import numpy as np
 import traci
 from numpy.typing import NDArray
 
+from .agent import DQNAgent
 from .constants import GRID2X2_NET, GRID2X2_ROUTES, GRID2X2_SUMOCFG
 from .intersection_spec import IntersectionSpec
 from .junction_env import JunctionEnv
+from .model import Model
 from .net_parser import build_specs_from_net
 from .route_gen import GridODRoutes
 from .session import SumoSession
 from .settings import Settings
+from .transition import TransitionModel
+
+# Controller modes that drive the transition model f forward (need arrival rates).
+_ROLLOUT_MODES = frozenset({"rollout_1s", "rollout_ms"})
+# Controller modes backed by a trained value function (DQN or rollout tail H).
+_MODEL_MODES = frozenset({"dqn", "rollout_1s", "rollout_ms"})
 
 # Per-agent phase-machine states.
 _DECIDE = "DECIDE"
@@ -104,6 +112,41 @@ class GreedyController:
         """No per-episode state to reset."""
 
 
+class AgentController:
+    """Wraps a :class:`DQNAgent`, dispatching DQN or rollout action selection.
+
+    For ``dqn`` the action is the (epsilon-greedy) argmax of the shared Q-network.
+    For ``rollout_1s`` / ``rollout_ms`` the agent runs its look-ahead search over
+    *this junction's own* transition model ``f`` and arrival-rate estimate, with
+    the shared network as the tail value ``H`` — the decentralized Multi-Agent
+    Physics Shield.
+    """
+
+    def __init__(self, agent: DQNAgent, mode: str, depth: int | None = None) -> None:
+        """Initialize the controller.
+
+        Args:
+            agent: The DQN agent (its model may be shared across junctions).
+            mode: ``"dqn"``, ``"rollout_1s"`` or ``"rollout_ms"``.
+            depth: Look-ahead depth for ``rollout_ms`` (ignored otherwise).
+        """
+        self.agent = agent
+        self.mode = mode
+        self.depth = depth
+        self.needs_arrival_rates = mode in _ROLLOUT_MODES
+
+    def select(self, state: NDArray, prev_action: int, arrival_rates: NDArray | None) -> int:
+        """Select an action via the configured DQN/rollout path."""
+        if self.mode == "dqn":
+            return self.agent.choose_action(state)
+        if self.mode == "rollout_1s":
+            return self.agent.select_rollout_1s(state, prev_action, arrival_rates)
+        return self.agent.select_rollout_ms(state, prev_action, arrival_rates, depth=self.depth)
+
+    def reset(self) -> None:
+        """No per-episode state to reset (epsilon is managed by the trainer)."""
+
+
 @dataclass
 class _AgentSchedule:
     """Per-junction phase state machine + per-episode metric accumulators."""
@@ -137,6 +180,7 @@ class MultiAgentRunner:
         green_duration: int,
         yellow_duration: int,
         extra_sumo_args: list[str] | None = None,
+        on_decision: Callable[[str, NDArray, int, int], None] | None = None,
     ) -> None:
         """Initialize the runner.
 
@@ -147,6 +191,9 @@ class MultiAgentRunner:
             green_duration: Green hold time (s) applied per decision.
             yellow_duration: Yellow hold time (s) inserted on a phase change.
             extra_sumo_args: Extra SUMO CLI flags appended at start (e.g. GUI play).
+            on_decision: Optional hook called at every decision point with
+                ``(tl, state, action, prev_action)`` — used by the trainer to
+                assemble per-junction transitions into the shared replay buffer.
         """
         self.session = session
         self.junctions = junctions
@@ -154,6 +201,7 @@ class MultiAgentRunner:
         self.green_duration = green_duration
         self.yellow_duration = yellow_duration
         self.extra_sumo_args = extra_sumo_args or []
+        self.on_decision = on_decision
 
         self.order = sorted(junctions)
         self.schedules: dict[str, _AgentSchedule] = {tl: _AgentSchedule() for tl in self.order}
@@ -222,6 +270,8 @@ class MultiAgentRunner:
         rates = junction.get_arrival_rates() if controller.needs_arrival_rates else None
         action = controller.select(state, sched.prev_action, rates)
         sched.n_decisions += 1
+        if self.on_decision is not None:
+            self.on_decision(tl, state, action, sched.prev_action)
 
         if sched.prev_action != -1 and action != sched.prev_action:
             junction.set_yellow_phase(spec.action_to_phase[sched.prev_action])
@@ -303,57 +353,93 @@ def build_grid_junctions(
     }
 
 
+def build_grid_session(settings: Settings, *, gui: bool = False) -> SumoSession:
+    """Build the shared grid :class:`SumoSession` with the OD route generator.
+
+    Args:
+        settings: Validated configuration (demand and horizon).
+        gui: Whether to launch the SUMO GUI binary.
+
+    Returns:
+        A session wired to the committed grid sumocfg and a :class:`GridODRoutes`.
+    """
+    return SumoSession(
+        sumocfg_file=GRID2X2_SUMOCFG,
+        gui=gui,
+        max_steps=settings.max_steps,
+        n_cars_generated=settings.n_cars_generated,
+        turn_chance=settings.turn_chance,
+        route_generator=GridODRoutes(
+            netfile=GRID2X2_NET,
+            out_file=GRID2X2_ROUTES,
+            n_cars_generated=settings.n_cars_generated,
+            max_steps=settings.max_steps,
+        ),
+    )
+
+
+def _grid_multistep_depth(settings: Settings) -> int:
+    """Look-ahead depth for grid ``rollout_ms`` (mirrors the eval-harness default)."""
+    return settings.lookahead_depth if settings.lookahead_depth >= 2 else 3  # noqa: PLR2004
+
+
 def build_grid_runner(
     settings: Settings,
     *,
     mode: str = "greedy",
     gui: bool = False,
+    model: Model | None = None,
     extra_sumo_args: list[str] | None = None,
 ) -> MultiAgentRunner:
     """Assemble a :class:`MultiAgentRunner` for the committed 2x2 grid.
 
     Args:
         settings: Validated configuration (provides demand, horizon, durations).
-        mode: Controller mode; ``"fixed_time"`` or ``"greedy"`` (model-free). The
-            ``"dqn"`` / ``"rollout_*"`` modes require a trained 16->4 grid value
-            function and are wired in Phase 2.4.
+        mode: Controller mode. ``"fixed_time"`` / ``"greedy"`` are model-free;
+            ``"dqn"`` / ``"rollout_1s"`` / ``"rollout_ms"`` require a trained
+            shared (16->4) ``model``. Rollout modes run one agent per junction —
+            each with its own transition model and arrival estimate — sharing the
+            given model as the tail value (the Multi-Agent Physics Shield).
         gui: Whether to launch the SUMO GUI binary.
+        model: Trained shared Q-network; required for the model-backed modes.
         extra_sumo_args: Extra SUMO CLI flags appended at start (GUI playback).
 
     Returns:
-        A ready-to-run multi-agent runner over the grid.
+        A ready-to-run multi-agent runner over the grid (epsilon 0 for eval).
 
     Raises:
-        ValueError: If ``mode`` is not a model-free controller.
+        ValueError: For an unknown mode, or a model-backed mode without a model.
     """
     specs = build_specs_from_net(GRID2X2_NET)
-    route_generator = GridODRoutes(
-        netfile=GRID2X2_NET,
-        out_file=GRID2X2_ROUTES,
-        n_cars_generated=settings.n_cars_generated,
-        max_steps=settings.max_steps,
-    )
-    session = SumoSession(
-        sumocfg_file=GRID2X2_SUMOCFG,
-        gui=gui,
-        max_steps=settings.max_steps,
-        n_cars_generated=settings.n_cars_generated,
-        turn_chance=settings.turn_chance,
-        route_generator=route_generator,
-    )
+    session = build_grid_session(settings, gui=gui)
     junctions = build_grid_junctions(settings, specs, session)
 
+    if mode in _MODEL_MODES and model is None:
+        msg = f"mode '{mode}' requires a trained shared grid model"
+        raise ValueError(msg)
+
+    depth = _grid_multistep_depth(settings)
     controllers: dict[str, Controller] = {}
     for tl, junction in junctions.items():
+        num_actions = junction.spec.num_actions
         if mode == "fixed_time":
-            controllers[tl] = FixedTimeController(junction.spec.num_actions)
+            controllers[tl] = FixedTimeController(num_actions)
         elif mode == "greedy":
-            controllers[tl] = GreedyController(junction.stage_cost, junction.spec.num_actions)
-        else:
-            msg = (
-                f"mode '{mode}' needs a trained grid model (Phase 2.4); "
-                "use 'fixed_time' or 'greedy' for now"
+            controllers[tl] = GreedyController(junction.stage_cost, num_actions)
+        elif mode in _MODEL_MODES:
+            # One agent per junction, all sharing the trained model as H; rollout
+            # agents additionally get this junction's own transition model + cost.
+            agent = DQNAgent(
+                settings=settings,
+                model=model,
+                transition=TransitionModel.from_settings(settings, junction.spec),
+                cost_fn=junction.stage_cost,
+                epsilon=0.0,
             )
+            agent.num_actions = num_actions  # honour the spec, not the global constant
+            controllers[tl] = AgentController(agent, mode, depth=depth)
+        else:
+            msg = f"Unknown grid controller mode: {mode}"
             raise ValueError(msg)
 
     return MultiAgentRunner(
