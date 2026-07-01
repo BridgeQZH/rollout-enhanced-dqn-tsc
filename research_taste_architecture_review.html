@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research &amp; Architecture Review — rollout-enhanced-dqn-tsc</title>
+<style>
+  :root {
+    --ink: #1c2430; --muted: #5c6a7a; --line: #d7dde5; --bg: #f4f6f8;
+    --panel: #ffffff; --accent: #0f766e; --warn-bg: #fff7e6; --warn-line: #f0c36d;
+    --bad: #b42318; --good: #0f766e; --info-bg: #eef4fb; --info-line: #9db8d9;
+    --code-bg: #f0f2f5;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: var(--ink);
+         background: var(--bg); line-height: 1.6; font-size: 16px; }
+  header { background: #14283c; color: #fff; padding: 44px 48px 36px; }
+  header h1 { margin: 0 0 10px; font-size: 30px; font-weight: 700; letter-spacing: .2px; }
+  header .sub { color: #c3d2e2; max-width: 950px; font-size: 15.5px; }
+  header .meta { color: #8ba3bb; font-size: 13px; margin-top: 14px;
+                 font-family: "Segoe UI", Arial, sans-serif; }
+  nav { background: #fff; border-bottom: 1px solid var(--line); padding: 10px 48px;
+        font-family: "Segoe UI", Arial, sans-serif; font-size: 13px; position: sticky; top: 0; z-index: 5; }
+  nav a { color: #33506b; text-decoration: none; margin-right: 14px; white-space: nowrap; }
+  nav a:hover { text-decoration: underline; }
+  main { max-width: 1080px; margin: 0 auto; padding: 34px 26px 80px; }
+  h2 { font-size: 23px; margin: 46px 0 14px; padding-bottom: 6px; border-bottom: 2px solid #cfd8e0; }
+  h3 { font-size: 17.5px; margin: 28px 0 8px; }
+  p { margin: 10px 0; }
+  code, .path { font-family: Consolas, "SF Mono", Menlo, monospace; font-size: 0.87em;
+        background: var(--code-bg); padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+  pre { background: #101a26; color: #d8e3ee; padding: 16px 18px; border-radius: 8px;
+        overflow-x: auto; font-size: 13.5px; line-height: 1.55; }
+  pre code { background: none; color: inherit; padding: 0; white-space: pre; }
+  table { border-collapse: collapse; width: 100%; background: var(--panel);
+          border: 1px solid var(--line); font-size: 14px; margin: 14px 0;
+          font-family: "Segoe UI", Arial, sans-serif; }
+  th, td { padding: 8px 11px; border-bottom: 1px solid #e7ebf0; text-align: left; vertical-align: top; }
+  th { background: #eaeff4; font-weight: 600; color: #2c3e50; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scores { display: flex; gap: 16px; flex-wrap: wrap; margin: 22px 0; }
+  .score-card { flex: 1 1 240px; background: var(--panel); border: 1px solid var(--line);
+                border-radius: 10px; padding: 18px 20px; font-family: "Segoe UI", Arial, sans-serif; }
+  .score-card .label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .6px; }
+  .score-card .value { font-size: 34px; font-weight: 700; margin: 4px 0 2px; }
+  .score-card .note { font-size: 13px; color: var(--muted); }
+  .callout { border-radius: 8px; padding: 13px 17px; margin: 16px 0; font-size: 14.5px; }
+  .callout.warn { background: var(--warn-bg); border: 1px solid var(--warn-line); }
+  .callout.info { background: var(--info-bg); border: 1px solid var(--info-line); }
+  .callout.good { background: #ecf8f4; border: 1px solid #7fc8b4; }
+  .callout .tag { font-weight: 700; font-family: "Segoe UI", Arial, sans-serif; font-size: 12.5px;
+                  text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 4px; }
+  .good-t { color: var(--good); font-weight: 600; }
+  .bad-t { color: var(--bad); font-weight: 600; }
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0;
+          font-family: "Segoe UI", Arial, sans-serif; }
+  .flow-row { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+  .flow-box { background: var(--panel); border: 1.5px solid #9fb2c4; border-radius: 8px;
+              padding: 10px 14px; font-size: 13.5px; flex: 1 1 200px; }
+  .flow-box b { display: block; font-size: 13px; color: #14283c; margin-bottom: 3px; }
+  .flow-arrow { text-align: center; color: #8298ac; font-size: 20px; padding: 2px 0; }
+  .lvl { border-left: 4px solid #9fb2c4; padding: 4px 0 4px 16px; margin: 18px 0; }
+  .lvl.l1 { border-color: #6fae6f; } .lvl.l2 { border-color: #d9a441; } .lvl.l3 { border-color: #b45252; }
+  ul, ol { margin: 8px 0 8px 4px; padding-left: 22px; }
+  li { margin: 5px 0; }
+  .small { font-size: 13px; color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 20px 0 40px;
+           font-family: "Segoe UI", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Research Taste &amp; Architecture Review<br><span style="font-size:20px; font-weight:400; color:#c3d2e2;">rollout-enhanced-dqn-tsc — Rollout-Enhanced DQN for Single-Intersection Traffic Signal Control</span></h1>
+  <div class="sub">
+    An independent reassessment of the repository from a software-architecture and a
+    scientific-research perspective. All claims below are grounded in direct inspection of the
+    source code, configuration files, and committed result artifacts; the offline validation
+    harness (<code>validate_chapter8.py</code>) was re-executed as part of this review.
+  </div>
+  <div class="meta">Review date: 2026-07-02 &nbsp;·&nbsp; Repository state: commit <code>ce0f138</code> (&ldquo;single intersection situation&rdquo;) &nbsp;·&nbsp; ~60 tracked files, 74&nbsp;MB (incl. 36&nbsp;MB demo video)</div>
+</header>
+
+<nav>
+  <a href="#summary">1 Summary</a>
+  <a href="#map">2 Repo Map</a>
+  <a href="#story">3 Research Story</a>
+  <a href="#algo">4 Algorithm</a>
+  <a href="#traffic">5 Traffic Model</a>
+  <a href="#experiments">6 Experiments</a>
+  <a href="#architecture">7 Architecture</a>
+  <a href="#taste">8 Research Taste</a>
+  <a href="#plan">9 Improvement Plan</a>
+  <a href="#risks">10 Risks</a>
+  <a href="#verdict">11 Verdict</a>
+</nav>
+
+<main>
+
+<!-- ================================================================ -->
+<h2 id="summary">1 · Title and Executive Summary</h2>
+
+<div class="scores">
+  <div class="score-card">
+    <div class="label">Research taste</div>
+    <div class="value">7 / 10</div>
+    <div class="note">A well-posed, honestly-reported question (when does test-time search recover value-network error?) with unusually good statistical hygiene — but limited algorithmic novelty and a narrow experimental scope.</div>
+  </div>
+  <div class="score-card">
+    <div class="label">Engineering maturity</div>
+    <div class="value">7 / 10</div>
+    <div class="note">Clean, typed, well-documented core engine with validated configs and reproducibility manifests — undermined by zero tests, README/repo drift, and gitignored artifacts the pipeline depends on.</div>
+  </div>
+  <div class="score-card">
+    <div class="label">Paper readiness</div>
+    <div class="value">4 / 10</div>
+    <div class="note">Single intersection, single demand profile, no literature baselines (max-pressure, actuated, MPLight-class), pseudo-replicated statistics, and a tiny nominal-demand effect. Strong as a thesis chapter; not yet a venue submission.</div>
+  </div>
+</div>
+
+<p><strong>Verdict in one paragraph.</strong> This project studies one clean mechanism — a
+one/multi-step lookahead over an analytic store-and-forward transition model <code>f</code> and
+stage cost <code>g</code>, bootstrapped by a frozen DQN tail value <code>H</code> — and asks when
+that lookahead recovers performance the frozen network leaves on the table. The two empirical
+answers (it compensates <em>under-training</em>, and it re-opens a large gap <em>off-distribution</em>
+at heavy demand, with a variance/tail-truncation mechanism) are supported by committed CSVs that
+I re-verified: the repository&rsquo;s own recompute-from-source harness passes
+<span class="good-t">41/41 checks</span> against the shipped data. The reward/tail-value
+alignment (<code>reward ≡ g</code> so <code>β = 1</code>), SMDP-correct <code>γ<sup>Δ</sup></code>
+discounting, route-hash-asserted paired design, and demand-shedding guard show genuine research
+care rare at this project scale. The main weaknesses are scientific scope rather than execution:
+the algorithm is a textbook truncated rollout (Bertsekas-style) applied to one symmetric SUMO
+junction; the &ldquo;n pairs&rdquo; statistics pool model seeds and traffic seeds as if independent;
+the converged model has only two seeds; the fixed-time baseline is untuned; the state omits the
+current phase (a formal MDP gap); and the headline lookahead depth (3) comes from a hard-coded
+fallback rather than the config. Overall: a serious, credible research prototype with a
+publishable <em>kernel</em> that needs broader scenarios and stronger baselines to become a paper.</p>
+
+<div class="callout warn">
+  <span class="tag">Scope caveat of this review</span>
+  Four directories referenced throughout the README are <strong>gitignored and absent</strong> from
+  this checkout: <code>models/</code> (all DQN checkpoints), <code>deck/</code> (slide deck +
+  EVIDENCE.md), <code>docs/</code> (narrative reports + reference paper PDF), and
+  <code>academic_artifacts/</code> (statistical summaries consumed by
+  <code>scripts/extract_evidence.py</code>). Also missing despite README references:
+  <code>activate.ps1</code>/<code>activate.sh</code> and <code>SUMO_GUI_RECORDING_GUIDE.md</code>.
+  Claims that depend on those artifacts (e.g. training-curve convergence of the 500-episode model)
+  could not be independently verified.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="map">2 · Repository Map</h2>
+
+<table>
+  <thead><tr><th style="width:34%">Path</th><th style="width:12%">Importance</th><th>Purpose &amp; comments</th></tr></thead>
+  <tbody>
+    <tr><td><code>clean_rollout_tlcs/env.py</code></td><td>Core</td><td><code>Environment</code>: SUMO/traci lifecycle, Weibull route generation, 12-D lane-count state (<code>get_state</code>), canonical stage cost <code>g</code> (<code>stage_cost</code>), causal upstream arrival-rate estimator with travel-time lag (<code>get_arrival_rates</code>), yellow-then-green action execution.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/transition.py</code></td><td>Core</td><td><code>TransitionModel.f</code>: SUMO-free point-queue / store-and-forward one-step model — arrivals over window Δ, saturation discharge over effective green, capacity clipping. Deliberately decoupled for unit-testing (though no tests exist).</td></tr>
+    <tr><td><code>clean_rollout_tlcs/agent.py</code></td><td>Core</td><td><code>DQNAgent</code>: replay buffer, Q-learning update with per-transition <code>γ<sup>Δ</sup></code> discount, and all five control paths (ε-greedy DQN, greedy-<code>g</code> base, one-step rollout, multi-step rollout, fixed-time cycler) plus f-residual logging hooks.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/model.py</code></td><td>Core</td><td>MLP Q-network wrapper (12 → 4×400 ReLU blocks → 4). Safe <code>state_dict</code> checkpoints with format-version and architecture metadata; <code>weights_only=True</code> loading.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/train.py</code></td><td>Core</td><td>Multi-seed training runner. Seeds all RNGs, disjoint route-seed schedule (<code>seed·10⁴+episode</code>), saves checkpoint + settings snapshot + training-curve text/PNG + <code>run_manifest.json</code>.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/eval.py</code></td><td>Core</td><td>Paired benchmark harness: 5 modes × 30 seeds, one route file per seed with MD5 hash asserted unchanged across modes; emits tidy CSV + <code>eval_manifest.json</code>; logs f-fidelity (MAE, Spearman) and throughput/residual anti-shedding metrics.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/settings.py</code> / <code>constants.py</code></td><td>Core</td><td>Pydantic-validated <code>Settings</code> (fail-loud YAML) and a single constants module holding every magic number (phase maps, lane geometry, capacities, detector placement). Excellent practice.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/settings/*.yaml</code></td><td>High</td><td>100-episode and 500-episode training configs; identical physics, only horizon differs.</td></tr>
+    <tr><td><code>clean_rollout_tlcs/eval_results/</code> · <code>eval_results_long/</code></td><td>High</td><td>Committed paired-benchmark CSVs: 100-ep × 3 model seeds (450 rows) and 500-ep × 2 model seeds (300 rows), plus <code>analysis_summary.json</code> and a bilingual HTML report. <span class="bad-t">Older CSV schema — no throughput/residual columns.</span></td></tr>
+    <tr><td><code>eval_results_stress/</code></td><td>High</td><td>Demand sweep D ∈ {1000, 1500, 2000} × 2 model seeds, per-demand settings snapshots, <code>stress_analysis_summary.json</code>, two PDF figures, <code>sweep_plan.json</code>. Newer CSV schema includes throughput/residual.</td></tr>
+    <tr><td><code>analyze_stress_results.py</code></td><td>High</td><td>Self-contained (no SciPy) Wilcoxon, Jonckheere–Terpstra, OLS-interaction, bootstrap CIs, demand-shedding guard, dispersion/tail figures. 908 lines, well documented.</td></tr>
+    <tr><td><code>validate_chapter8.py</code></td><td>High</td><td>Independent recompute-from-source check of every Chapter-8 number against hard-coded prose values. <span class="good-t">Re-run during this review: 41/41 PASS.</span></td></tr>
+    <tr><td><code>stress_sweep.py</code></td><td>Medium</td><td>Sweep <em>orchestrator</em>: derives per-demand YAMLs and prints (does not run) exact eval commands; writes <code>sweep_plan.json</code>. Contains stale comments claiming throughput is missing from the &ldquo;frozen&rdquo; schema, contradicted by the actual stress CSVs.</td></tr>
+    <tr><td><code>scripts/</code></td><td>Medium</td><td><code>extract_evidence.py</code> → <code>evidence.json</code>/<code>deck/EVIDENCE.md</code>; <code>generate_figures.py</code> (deck SVGs); <code>run_gui_demo.py</code> (SUMO-GUI + live matplotlib telemetry, reuses frozen <code>_select_action</code>). The first two depend on gitignored <code>academic_artifacts/</code> and write into gitignored <code>deck/</code>.</td></tr>
+    <tr><td><code>intersection/</code></td><td>High</td><td>SUMO network (<code>environment.net.xml</code>: 4×750 m arms, 8-phase static <code>tlLogic</code>), <code>sumo_config.sumocfg</code>, GUI view settings. Route files regenerated per episode.</td></tr>
+    <tr><td><code>media/final_comparison.mp4</code></td><td>Low</td><td>Curated 36 MB D=2000 DQN-vs-rollout demo video with telemetry overlay.</td></tr>
+    <tr><td><code>README.md</code>, <code>BUILD_INSTRUCTIONS.md</code>, <code>pyproject.toml</code>, <code>requirements.txt</code></td><td>Medium</td><td>Strong scientific README (abstract, findings table, method, reproducibility). Pinned deps (torch 2.9.0, numpy 2.3.4, SUMO 1.24). <span class="bad-t">Multiple dangling references</span> (see §7) and <code>BUILD_INSTRUCTIONS.md</code> names the author&rsquo;s local root <code>D:\rl_cc</code>.</td></tr>
+    <tr><td><em>Absent (gitignored)</em>: <code>models/</code>, <code>deck/</code>, <code>docs/</code>, <code>academic_artifacts/</code></td><td>—</td><td>Checkpoints, slide deck, narrative reports, and intermediate statistical summaries are not in the repo. Evaluation cannot be re-run from a fresh clone without retraining.</td></tr>
+    <tr><td><em>Absent entirely</em>: <code>tests/</code>, CI config</td><td>—</td><td>No test suite of any kind, despite <code>transition.py</code> explicitly advertising its testability.</td></tr>
+  </tbody>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="story">3 · Reconstructed Research Story</h2>
+
+<p>In plain English, the project&rsquo;s scientific narrative is:</p>
+
+<ol>
+  <li><strong>Problem.</strong> Control a single 4-way signalized intersection to minimize total
+  vehicle delay (the integral of queue length over time). Deep RL controllers work here, but they
+  are expensive to train and brittle when real traffic drifts away from the training distribution.</li>
+  <li><strong>Hypothesis.</strong> Both failure modes — under-training and distribution shift —
+  are the <em>same</em> thing: residual approximation error in the learned value function. A short
+  online lookahead (&ldquo;rollout&rdquo;) grounded in cheap traffic physics can correct that error
+  at decision time, spending test-time compute instead of training samples.</li>
+  <li><strong>Mechanism.</strong> Score each candidate phase <code>u</code> by
+  <code>g(x,u) + β·γ<sup>Δ</sup>·H(f(x,u))</code>: an exact analytic cost for the next signal
+  window plus the frozen DQN&rsquo;s estimate of everything after. The physics model
+  <code>f</code> only needs to <em>rank</em> actions correctly, so it stays valid off-distribution
+  where <code>H</code> degrades.</li>
+  <li><strong>Findings.</strong> (a) With a 100-episode under-trained DQN, depth-3 rollout recovers
+  ≈85% of the gap to a 500-episode DQN (paired p = 0.019). (b) On the converged model the
+  advantage washes out at nominal demand (p = 0.55) — reported as a <em>confirmation</em>, not
+  hidden. (c) Stressing demand 1000 → 2000 vehicles/episode re-opens the gap monotonically to a
+  ≈15% delay reduction (p ≈ 1.7×10⁻¹⁰), explained by tail truncation: rollout clips the DQN&rsquo;s
+  catastrophic worst-case episodes (max delay 99,586 → 43,389 veh·s; CV 0.259 → 0.099).</li>
+</ol>
+
+<div class="flow">
+  <div class="flow-row">
+    <div class="flow-box"><b>SUMO microsimulation</b><code>intersection/environment.net.xml</code> — ground-truth dynamics, 4×750 m arms, 8-phase light. Vehicles: Weibull(2) departure profile, 25% turners (<code>env.generate_routefile</code>).</div>
+    <div class="flow-box"><b>Observation x ∈ ℝ¹²</b><code>env.get_state()</code> — per-lane-group vehicle counts within 100 m of the stop line (<code>STOPLINE_ZONE_M</code>, <code>constants.py:176</code>).</div>
+    <div class="flow-box"><b>Arrival sensing λ</b><code>env.get_arrival_rates()</code> — virtual detector 636 m upstream, 100 s window, lag τ = d/v ≈ 45.8 s (causal: no oracle future arrivals).</div>
+  </div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-row">
+    <div class="flow-box"><b>Stage cost g (= reward)</b><code>env.stage_cost()</code> — discounted integral of <em>unserved</em> queue counts over the window Δ = green (+ yellow on switch). DQN is trained on <code>R = g</code>, making H and g commensurate (β = 1 by construction).</div>
+    <div class="flow-box"><b>Transition model f</b><code>transition.TransitionModel.f</code> — x′ = clip(x + λΔ − A(u)·s·lanes·green_eff, 0, C). Startup lost time 2 s on switch; saturation 0.5 veh/s/lane.</div>
+    <div class="flow-box"><b>Amortized value H</b><code>agent.tail_value()</code> = max<sub>a</sub> Q(x,a); MLP 12→(400×4)→4 (<code>model.py</code>), trained offline by <code>train.py</code>, then <em>frozen</em>.</div>
+  </div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-row">
+    <div class="flow-box" style="border-color:#0f766e"><b>Rollout controller (evaluation-time only)</b>
+    <code>agent.select_rollout_1s / select_rollout_ms</code> — argmax over candidate first phases of
+    accumulated analytic g&rsquo;s (greedy-g base policy beyond step 1) plus discounted DQN tail at the
+    leaf. Compared against dqn / greedy / fixed_time under identical, hash-verified traffic
+    (<code>eval.py</code>).</div>
+  </div>
+</div>
+
+<p>The connection between the pieces is the project&rsquo;s strongest conceptual asset: <code>g</code>
+is simultaneously the training reward, the rollout stage cost, and (approximately) the evaluation
+objective, so the lookahead score and the learned value live on one scale and the rollout weight
+β = 1 needs no tuning. That alignment is enforced in code, not just prose
+(<code>agent.py</code> docstring &ldquo;sign convention (locked)&rdquo;; <code>train.py:162</code>).</p>
+
+<!-- ================================================================ -->
+<h2 id="algo">4 · Algorithmic Interpretation</h2>
+
+<h3>4.1 What is actually implemented</h3>
+<p>Five controllers share one <code>DQNAgent</code> (<code>agent.py</code>):</p>
+<table>
+  <thead><tr><th>Mode</th><th>Decision rule (as implemented)</th><th>Needs</th></tr></thead>
+  <tbody>
+    <tr><td><code>fixed_time</code></td><td>Deterministic cycle 0→1→2→3 (<code>choose_action_fixed_time</code>), i.e. a 56 s cycle given green = 10 s, yellow = 4 s.</td><td>nothing</td></tr>
+    <tr><td><code>greedy</code></td><td>argmax<sub>u</sub> g(x,u,u<sub>prev</sub>) (<code>greedy_base</code>) — myopic, serves the currently most-costly unserved lanes. Structurally a queue-based max-pressure-like rule without downstream terms.</td><td>g</td></tr>
+    <tr><td><code>dqn</code></td><td>argmax<sub>a</sub> Q(x,a) with ε = 0 at evaluation (<code>choose_action</code>).</td><td>Q</td></tr>
+    <tr><td><code>rollout_1s</code></td><td>argmax<sub>u</sub> [g(x,u) + β·γ<sup>Δ</sup>·H(f(x,u,λ))] (<code>select_rollout_1s</code>).</td><td>g, f, λ, Q</td></tr>
+    <tr><td><code>rollout_ms</code></td><td>Depth-h lookahead: first action enumerated, steps 2…h follow the <em>greedy-g base policy</em> on imagined states, cumulative <code>γ<sup>ΣΔ</sup></code> discounting, DQN tail at the leaf (<code>select_rollout_ms</code>). Arrival rates λ held constant across the imagined horizon.</td><td>g, f, λ, Q</td></tr>
+  </tbody>
+</table>
+
+<h3>4.2 Where rollout sits in the pipeline</h3>
+<p>Rollout is used <strong>only for evaluation-time action selection</strong>. Training
+(<code>train.py</code>) is plain ε-greedy DQN: rollout never shapes exploration, replay targets, or
+policy improvement during learning. This matches the stated &ldquo;frozen prior + test-time
+search&rdquo; framing exactly — the implementation is faithful to the idea. It is a
+<em>one-shot</em> rollout in Bertsekas&rsquo;s sense (single policy-improvement step over base policy +
+terminal cost approximation), not an iterated rollout/AlphaZero-style training loop.</p>
+
+<h3>4.3 Correctness details that were done right</h3>
+<ul>
+  <li><strong>SMDP-consistent discounting.</strong> Actions are temporally extended (10 s green,
+  +4 s yellow on switch). Both the replay bootstrap (<code>Sample.discount = γ<sup>Δ</sup></code>,
+  <code>agent.replay</code>) and the rollout tail use the same per-transition <code>γ<sup>Δ</sup></code>
+  — a subtle point most TSC-DQN codebases get wrong by using a per-decision γ.</li>
+  <li><strong>Reward/tail commensurability.</strong> <code>reward ≡ g</code>
+  (<code>train.py:162</code>) makes β = 1 principled rather than a tuned hyperparameter.</li>
+  <li><strong>No lexicographic tie-break bugs.</strong> Scores accumulate into float arrays with
+  <code>np.argmax</code> (called out explicitly in docstrings — evidence of a past bug hunt).</li>
+  <li><strong>f-fidelity is measured, not assumed.</strong> Every rollout evaluation logs the
+  predicted-vs-realized next state (<code>log_residual</code>); the honest answer (Spearman ρ ≈ 0.54,
+  MAE ≈ 0.24 veh) is committed in <code>analysis_summary.json</code>.</li>
+</ul>
+
+<h3>4.4 Gaps and quiet discrepancies</h3>
+<div class="callout warn">
+  <span class="tag">Headline hyperparameter comes from a hard-coded fallback</span>
+  All configs ship <code>lookahead_depth: 1</code>, and <code>Settings</code> even forbids
+  <code>rollout_ms</code> with depth &lt; 2. The evaluation harness silently substitutes
+  <code>DEFAULT_MULTISTEP_DEPTH = 3</code> (<code>eval.py:71,363-367</code>) — confirmed by
+  <code>eval_manifest.json</code> (&ldquo;multistep_depth&rdquo;: 3). The depth that produces every
+  headline number is therefore invisible in the config system. Works, but is a reproducibility trap.
+</div>
+<ul>
+  <li><strong>The state omits the current phase.</strong> The true state of this SMDP includes
+  <code>u_prev</code> (it determines whether a yellow is inserted and the switch cost), and the
+  rollout score conditions on it — but the Q-network input is only the 12-D queue vector.
+  <code>H(f(x,u))</code> cannot distinguish &ldquo;arrived at x′ mid-phase-0&rdquo; from
+  &ldquo;mid-phase-2&rdquo;. Formally the DQN solves a slightly aliased POMDP. Likely a small
+  effect with switch_penalty = 0, but it is exactly the kind of gap a reviewer will find.</li>
+  <li><strong>Vanilla DQN without a target network.</strong> <code>agent.replay</code> bootstraps
+  from the online network; training is Vidali-style episodic offline (800 gradient steps after
+  each episode). No Double-DQN, no gradient clipping, no terminal masking (the last transition of
+  each episode still bootstraps). Acceptable for the inherited chassis, but the &ldquo;converged
+  500-episode DQN&rdquo; claim rests on a learner with known instability modes and no committed
+  training curves to inspect.</li>
+  <li><strong>Training reward is the analytic surrogate, not the realized cost.</strong>
+  <code>R = g(x,u,u_prev)</code> is computed <em>before</em> execution from the current state
+  (assumes unserved queues constant over the window, ignores arrivals within it), while evaluation
+  uses realized queue-seconds from SUMO. The two are strongly correlated but not identical; the DQN
+  optimizes a model of the objective, not the objective.</li>
+  <li><strong>One-step rollout does not actually work at 100 episodes.</strong> The committed
+  phase-3 report (<code>clean_rollout_tlcs/eval_results/phase3_paired_benchmark_report.html</code>)
+  shows <code>rollout_1s</code> <em>losing</em> to bare DQN at 100 ep (−0.75% wait, 47.8% win rate);
+  only depth-3 <code>rollout_ms</code> wins (+1.12%). The README&rsquo;s method section is written
+  around the one-step formula, but the headline evidence comes from the multi-step variant. This
+  variant-selection nuance should be surfaced, not left in a sub-report.</li>
+  <li><strong>Constant-λ imagined futures.</strong> <code>select_rollout_ms</code> reuses the
+  current arrival-rate estimate for all imagined steps — fine at depth 3 (~30–42 s), but an
+  undocumented approximation of the lookahead.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="traffic">5 · Traffic Modeling Assessment</h2>
+
+<h3>5.1 Ground-truth simulation</h3>
+<p>The evaluation world is a genuine microsimulation (SUMO 1.24), not the analytic model — an
+important credibility point: <code>f</code>/<code>g</code> are used only inside the controller&rsquo;s
+head, and all reported metrics come from SUMO. The network is the Vidali thesis junction: four
+750 m arms × 4 lanes (1 left-turn + 2 through + 1 through/right), 8-phase static
+<code>tlLogic</code> overridden step-by-step via traci (<code>intersection/environment.net.xml:127-136</code>,
+<code>env._set_green_phase</code>).</p>
+
+<table>
+  <thead><tr><th>Component</th><th>Implementation</th><th>Assessment</th></tr></thead>
+  <tbody>
+    <tr><td>Arrival process</td><td>N vehicles per episode, departure times = sorted Weibull(k=2) samples rescaled to [0, 5400 s]; route straight w.p. 0.75 else uniform turn (<code>env.generate_routefile</code>).</td><td>A single-peak synthetic profile, identical shape at every demand level and on every arm. No asymmetric, multi-peak, or time-varying-composition demand. &ldquo;Distribution shift&rdquo; in this project means <em>volume scaling only</em>.</td></tr>
+    <tr><td>Departure / discharge</td><td>SUMO car-following (accel 1.0, decel 4.5, vmax 25 m/s); analytic <code>f</code> assumes 0.5 veh/s/lane (~1800 veh/h) saturation with 2 s startup lost time (<code>constants.py:199-205</code>).</td><td>Standard signalized-intersection values; reasonable. Calibration is asserted (&ldquo;calibrated in Phase 2&rdquo;) but no calibration script or artifact is in the repo — <code>CALIBRATION_FILE = fg_calibration.json</code> (<code>constants.py:30</code>) is a dead constant.</td></tr>
+    <tr><td>Queue state</td><td>Counts within 100 m of the stop line, 12 lane groups; capacity 13.33 veh/lane from 7.5 m footprint (<code>constants.py:215</code>).</td><td>Deliberately minimal and defensible (max-pressure lineage). But queues beyond 100 m are invisible: exactly at D = 2000 — where the headline claim lives — spillback beyond the zone truncates the observation. The state is <em>least</em> informative in the regime where the result matters most; worth an explicit analysis.</td></tr>
+    <tr><td>Signal phasing</td><td>4 green actions, matching yellows (4 s) inserted only on switching, fixed 10 s green quantum, no all-red, no minimum/maximum green constraints beyond the quantum.</td><td>Clean SMDP action space. However a 10 s green quantum makes the <code>fixed_time</code> baseline a 56 s naive cycle — untuned (no Webster timing), which inflates the &ldquo;−43% vs fixed-time&rdquo; framing. Real deployments would also need pedestrian/min-green constraints.</td></tr>
+    <tr><td>Sensing</td><td>Virtual detector 636 m upstream; vehicles counted once on first appearance; 100 s sliding window shifted back by lag τ ≈ 45.8 s (<code>env.get_arrival_rates</code>).</td><td>The causality discipline (no oracle access to the future route file) is a genuinely good design decision that many TSC papers skip. Since SUMO inserts vehicles at the arm entrance, the &ldquo;detector&rdquo; effectively logs insertions — acceptable, but a 636 m advance-detector assumption should be stated as an idealization.</td></tr>
+    <tr><td>Reward / objective</td><td>g = discounted unserved-queue integral (linear canonical; quadratic fairness ablation available via <code>cost_type</code>); evaluation metric = Σ halted vehicles per second (<code>total_wait_vehsec</code>).</td><td>Objective and reward are near-aligned by construction — the strongest part of the modeling. The quadratic ablation exists in code but no committed experiment uses it.</td></tr>
+    <tr><td>Episode</td><td>5400 s fixed horizon, fresh empty network each episode; residual vehicles counted to guard truncation bias.</td><td>Constant &ldquo;exam duration&rdquo; across demand levels is a documented, deliberate choice (<code>stress_sweep.py</code> truncation-bias note) with an escape hatch (<code>--max-steps</code>). Good.</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Net assessment:</strong> internally consistent and honest, but idealized along every
+axis that isn&rsquo;t the core mechanism: one vehicle type, symmetric demand, one junction, no
+pedestrians, no sensor noise beyond the estimator&rsquo;s own lag, single demand profile shape. The
+claims as scoped (&ldquo;in this simulated single intersection, rollout compensates value error&rdquo;)
+are supported; any generalization language beyond that is not yet earned.</p>
+
+<!-- ================================================================ -->
+<h2 id="experiments">6 · Experimental and Data Analysis Review</h2>
+
+<h3>6.1 What exists</h3>
+<table>
+  <thead><tr><th>Experiment</th><th>Data committed</th><th>Design</th><th>Headline result</th></tr></thead>
+  <tbody>
+    <tr><td>Nominal, under-trained (100 ep)</td><td><code>clean_rollout_tlcs/eval_results/</code> (3 CSVs + merged, 450 rows; <code>analysis_summary.json</code>; HTML report)</td><td>3 model seeds × 30 traffic seeds × 5 modes, D = 1000</td><td>rollout_ms vs dqn: +1.12% wait, 64.4% win, Wilcoxon p = 0.019; <span class="bad-t">rollout_1s: −0.75%, 47.8% win</span></td></tr>
+    <tr><td>Nominal, converged (500 ep)</td><td><code>clean_rollout_tlcs/eval_results_long/</code> (2 CSVs, 300 rows)</td><td><strong>2</strong> model seeds × 30 traffic seeds × 5 modes, D = 1000</td><td>washout: +0.12%, p = 0.553 (honestly reported as confirmation)</td></tr>
+    <tr><td>Demand stress sweep</td><td><code>eval_results_stress/D_{1000,1500,2000}/seed_{0,1}/</code> + <code>stress_analysis_summary.json</code> + 2 PDF figures</td><td>2 model seeds × 30 traffic seeds × 5 modes × 3 demand levels; model trained at D = 1000 only</td><td>+0.12% / +4.32% / +15.02%; JT trend z = +9.30; CV and worst-case tail collapse; no demand shedding (≈99.9% completion in all modes)</td></tr>
+    <tr><td>Latency cost of search</td><td><code>analysis_summary.json → latency</code></td><td>2000 CPU calls</td><td>rollout_ms 4.07 ms vs dqn 0.43 ms (≈9.5×)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout good">
+  <span class="tag">Verified during this review</span>
+  I re-ran <code>python validate_chapter8.py</code> against the committed CSVs on a clean Python
+  (numpy only): <strong>41/41 checks passed</strong>, including the win rates, reductions, completion
+  percentages, CVs, worst-case tails, JT and OLS statistics quoted in the README table. The numbers
+  are not hand-typed; they reproduce from source. This level of self-auditing
+  (independent recompute, tolerance-checked against prose) is well above the norm.
+</div>
+
+<h3>6.2 Where the evidence is weaker than it looks</h3>
+<ul>
+  <li><strong>Pseudo-replication in the paired tests.</strong> &ldquo;n = 90 pairs&rdquo; is 3 model
+  seeds × the <em>same</em> 30 traffic seeds; &ldquo;n = 60&rdquo; is 2 × 30. Pairs sharing a traffic
+  seed (and pairs sharing a model) are correlated, so the Wilcoxon and JT tests overstate the
+  effective sample size. The p = 0.019 sample-efficiency result is the fragile one — at D = 2000 the
+  effect (rank-biserial 0.95) survives any correction, but the 100-ep claim needs a
+  hierarchical/per-model-seed analysis or more independent traffic seeds.</li>
+  <li><strong>Two seeds for the converged model.</strong> <code>evidence.json → checkpoints</code>
+  confirms dqn_500ep has seeds {0, 1} vs {0, 1, 2} for 100 ep. Every stress conclusion rests on two
+  training runs; a third seed is cheap insurance against a lucky/unlucky converged prior.</li>
+  <li><strong>&ldquo;Converged&rdquo; is asserted, not shown.</strong> Training curves are written
+  per run (<code>train._save_series</code>) but live under gitignored <code>models/</code>. Nothing
+  committed demonstrates the 500-ep model plateaued, or how variable training was across seeds.</li>
+  <li><strong>Variant selection.</strong> The treatment in every headline analysis is
+  <code>rollout_ms</code> (depth 3, itself a hard-coded fallback — §4.4). <code>rollout_1s</code>,
+  the variant the method section is written around, is worse than DQN at 100 ep and only ties at
+  500 ep (per-mode means in <code>evidence.json</code>). No depth ablation (1/2/3/5) is committed,
+  so &ldquo;why depth 3?&rdquo; has no evidence-based answer.</li>
+  <li><strong>Baselines are internal only.</strong> fixed_time (untuned), greedy-g, and the DQN
+  itself. No Webster-timed fixed plan, no SUMO actuated control, no max-pressure, no published RL
+  method. For the paper-level claim (&ldquo;rollout is a robustness mechanism&rdquo;) the DQN-vs-rollout
+  pairing is fair and well-controlled; for any &ldquo;this is a good controller&rdquo; claim the
+  baseline set is inadequate.</li>
+  <li><strong>Train/eval demand separation is partial.</strong> Traffic <em>seeds</em> are provably
+  disjoint (eval 100000–100029 vs train s·10⁴+e with s ≤ 2 — verified in
+  <code>training_settings.yaml:51-54</code> and <code>train.py:53</code>), which is real leak
+  hygiene. But the nominal evaluations use the same demand level and profile shape as training, and
+  the stress evaluation varies only volume. Generalization across demand <em>shapes</em> (peaks,
+  asymmetry) is untested.</li>
+  <li><strong>Schema drift between experiment generations.</strong> The nominal CSVs lack
+  <code>throughput</code>/<code>residual_vehicles</code>; the stress CSVs have them. The
+  anti-shedding guard therefore protects only the stress claims, and stale comments in
+  <code>stress_sweep.py:74-90</code> still describe the pre-extension schema.</li>
+</ul>
+
+<h3>6.3 Visualization</h3>
+<p>Committed figures: <code>delta_of_demand.pdf</code> (Δ(D) with bootstrap CIs and the
+normalized-overlay confound check) and <code>robustness_dispersion.pdf</code> (CV growth +
+worst-case-tail bars) — both publication-shaped, generated by
+<code>analyze_stress_results.plot_delta_curve / plot_robustness_panel</code>. Missing: training
+curves, per-seed scatter/distribution plots for the paired differences (only summary stats), and
+any depth/β sensitivity figure. The deck figures pipeline exists (<code>scripts/generate_figures.py</code>)
+but its outputs are gitignored.</p>
+
+<!-- ================================================================ -->
+<h2 id="architecture">7 · Code Architecture Review</h2>
+
+<h3>7.1 Strengths</h3>
+<ul>
+  <li><strong>Clear module boundaries around the research objects.</strong> <code>f</code> lives in
+  a SUMO-free module (<code>transition.py</code>), sensing and <code>g</code> in the environment,
+  control paths in the agent, the network in <code>model.py</code>. Dependency injection
+  (<code>cost_fn</code>, <code>transition</code> passed into <code>DQNAgent</code>) keeps the agent
+  simulator-agnostic.</li>
+  <li><strong>Config discipline.</strong> One Pydantic <code>Settings</code> model with
+  cross-field validators drives every entry point; run directories get a YAML snapshot and a JSON
+  manifest (<code>train.py:205-229</code>, <code>eval._write_manifest</code>). Constants are
+  centralized and explained (<code>constants.py</code> is exemplary).</li>
+  <li><strong>Reproducibility mechanics.</strong> Global seeding (<code>set_global_seeds</code>),
+  deterministic disjoint route-seed schedules, MD5 route-hash assertion inside the benchmark loop
+  (<code>eval.py:398-400</code>), pinned requirements, versioned <code>state_dict</code>-only
+  checkpoints with <code>weights_only=True</code> loading.</li>
+  <li><strong>Self-contained statistics</strong> (no SciPy) that are then cross-checked by an
+  independent recompute harness — a defensive pattern that paid off (41/41).</li>
+  <li><strong>Docstring quality</strong> is unusually high; sign conventions and locked design
+  decisions are documented at the point of use.</li>
+</ul>
+
+<h3>7.2 Weaknesses</h3>
+<table>
+  <thead><tr><th style="width:30%">Issue</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td><span class="bad-t">No tests at all</span></td><td>No <code>tests/</code>, no CI. <code>transition.py</code>&rsquo;s docstring promises unit-testability of <code>f</code> — the promise is unredeemed. The analytic <code>f</code>/<code>g</code>, the self-rolled Wilcoxon/JT, and the pairing logic are exactly the components that deserve regression tests.</td></tr>
+    <tr><td>Duplicated mode dispatch</td><td><code>agent.select_action</code> (<code>agent.py:366-402</code>) and <code>eval._select_action</code> (<code>eval.py:295-334</code>) implement the same five-way dispatch; the eval version exists only to thread a depth override. A drifting sixth mode would need edits in both.</td></tr>
+    <tr><td>Asymmetric placement of f and g</td><td><code>f</code> is a standalone module; <code>g</code> is a method on <code>Environment</code> even though it never touches traci. The stated f/g symmetry of the method would be better expressed by a <code>costs.py</code> sibling; today the agent depends on a live environment object just to score hypothetical states.</td></tr>
+    <tr><td>Agent as a five-policy grab-bag</td><td><code>DQNAgent</code> holds the learner, the replay buffer, four unrelated controllers, a fixed-time counter, and residual-logging state. A <code>Policy</code> protocol with five small implementations would express the paper&rsquo;s central comparison (base vs learned vs rollout) in the type system instead of a mode string.</td></tr>
+    <tr><td>Dead / aspirational constants</td><td><code>CALIBRATION_FILE</code>, <code>SEEDS_FILE</code>, <code>DEFAULT_EVAL_PATH</code>, <code>DEFAULT_TEST_FOLDER</code>, <code>EVAL_SETTINGS_FILE</code> (<code>constants.py:21-36</code>) are referenced nowhere; <code>rollout_truncation</code> in <code>Settings</code> is never read by any control path.</td></tr>
+    <tr><td>Config bypassed for a headline parameter</td><td><code>DEFAULT_MULTISTEP_DEPTH = 3</code> fallback (§4.4) — the depth used by every shipped result is not in any YAML.</td></tr>
+    <tr><td>README / repo drift</td><td>README references <code>activate.ps1</code>, <code>activate.sh</code>, <code>SUMO_GUI_RECORDING_GUIDE.md</code>, <code>deck/EVIDENCE.md</code>, <code>docs/reference_paper_Vidali_DRL_TLCS.pdf</code> — none present. <code>BUILD_INSTRUCTIONS.md</code> hard-codes <code>D:\rl_cc</code>. <code>sweep_plan.json</code> records model paths <code>model_long/seed_*</code> while <code>stress_sweep.py</code> defaults to <code>models/dqn_500ep</code> — the committed artifacts were produced under a differently-named tree than the documented one.</td></tr>
+    <tr><td>Pipeline depends on gitignored inputs</td><td><code>scripts/extract_evidence.py</code> reads <code>academic_artifacts/statistical_summary.json</code> and writes into <code>deck/</code> — both gitignored, so the documented &ldquo;rebuild the deck&rdquo; loop cannot run from a fresh clone.</td></tr>
+    <tr><td>Copy-paste override in EvalEnvironment</td><td><code>EvalEnvironment._simulate</code> (<code>eval.py:128-152</code>) re-implements the parent loop to append accumulation lines; a per-step hook on <code>Environment._simulate</code> would remove the duplication and the risk of the two loops diverging.</td></tr>
+    <tr><td>Extensibility ceilings</td><td>Single-intersection assumptions are baked into module-level constants (<code>TRAFFIC_LIGHT_ID</code>, lane maps, <code>SERVED_LANES</code>). Multi-intersection or alternate topologies require touching <code>constants.py</code> everywhere rather than instantiating a network description. The RL side (MLP, replay) is similarly hard-wired to this state/action shape.</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Net:</strong> for a single-author research codebase this is top-quartile engineering —
+the abstractions mostly <em>help</em> the reader find the science. The debt is concentrated in the
+outer shell (docs drift, gitignored artifacts, no tests), not the core engine.</p>
+
+<!-- ================================================================ -->
+<h2 id="taste">8 · Research Taste Evaluation</h2>
+
+<p><strong>What shows genuine taste.</strong> The best decision in this project is what it chose
+<em>not</em> to claim. The washout at convergence (p = 0.553) is promoted to a headline finding —
+&ldquo;rollout is a compensation mechanism, not a free asymptotic gain&rdquo; — instead of being
+buried. The demand-shedding guard, throughput-normalization invariance check, route-hash pairing
+assertion, causal (lagged) arrival sensing, and the recompute-from-source validation harness are
+all answers to attacks a skeptical reviewer would make, built <em>before</em> the reviewer asked.
+The f-fidelity number (ρ ≈ 0.54) is unflattering and committed anyway, with the correct defense
+(f need only rank actions). The unifying frame — amortization vs test-time compute, with
+under-training and distribution shift as two faces of one value-approximation error — is a real
+idea, articulated crisply, and the tail-truncation mechanism (CV 0.259 → 0.099, worst case halved)
+is the kind of <em>mechanistic</em> explanation most empirical RL papers never attempt.</p>
+
+<p><strong>Where the taste falls short.</strong> First, algorithmic novelty is thin: truncated
+rollout with a learned terminal cost is textbook approximate dynamic programming, and
+&ldquo;test-time search fixes value-network error, most when the network is weak or
+off-distribution&rdquo; is the established lesson of the model-based search literature. The
+contribution is an application-domain instantiation with good measurement — legitimate, but it
+must be framed that way. Second, the f/g formalism is partly decoration: <code>g</code> genuinely
+earns its keep (it is the reward, the rollout stage cost, and the objective at once), but
+<code>f</code> is a four-line store-and-forward update whose &ldquo;Phase 2 calibration&rdquo; is
+asserted without committed evidence, and the one-step controller built most directly on the f/g
+story is the variant that <em>doesn&rsquo;t work</em> at 100 episodes. The intellectually honest
+version of the story is &ldquo;depth-3 lookahead under a greedy base policy&rdquo;, and the repo
+knows this (all headline treatments are <code>rollout_ms</code>) while the prose still leads with
+the one-step formula. Third, the experimental scope was chosen for cleanliness over stress: one
+symmetric junction, one demand shape, volume-only distribution shift, internal baselines only. That
+makes the result solid but small — the +1.12% nominal effect would not survive review as a
+sample-efficiency claim without the correlation-structure fix, and the impressive +15% result lives
+in exactly the regime (spillback past the 100 m sensing zone) where the state representation is
+weakest and least analyzed. Fourth, the &ldquo;PhD-interview deck&rdquo; orientation of the tooling
+suggests the project was optimized to <em>present</em> a finding at least as much as to
+<em>pressure-test</em> it; the missing depth/β ablations and the two-seed converged model are the
+symptoms.</p>
+
+<p><strong>Overall:</strong> this reads as the work of someone with strong experimental hygiene and
+above-average scientific honesty, one good mechanism-level insight, and not yet the breadth of
+evidence (or literature positioning) to convert it into a publishable contribution. Research taste
+7/10: high on rigor and honesty, middling on novelty and scope ambition.</p>
+
+<!-- ================================================================ -->
+<h2 id="plan">9 · What I Would Change If I Were Leading This Project</h2>
+
+<div class="lvl l1">
+<h3>Level 1 — low-effort cleanup (days)</h3>
+<ol>
+  <li><strong>Fix the README/repo contract.</strong> Remove or restore the dangling references
+  (<code>activate.*</code>, <code>SUMO_GUI_RECORDING_GUIDE.md</code>, <code>deck/EVIDENCE.md</code>,
+  <code>docs/*.pdf</code>); either commit <code>deck/</code>+<code>docs/</code> or stop pointing at
+  them. Fix <code>D:\rl_cc</code> in <code>BUILD_INSTRUCTIONS.md</code>.</li>
+  <li><strong>Publish the checkpoints and training curves.</strong> Attach
+  <code>models/dqn_100ep</code>/<code>dqn_500ep</code> (a few MB each) as a GitHub Release or
+  commit them; commit the <code>plot_reward/delay/queue</code> series so &ldquo;converged&rdquo; is
+  inspectable.</li>
+  <li><strong>Make depth a config value.</strong> Ship an <code>eval_settings.yaml</code> with
+  <code>lookahead_depth: 3</code> and delete the <code>DEFAULT_MULTISTEP_DEPTH</code> fallback
+  (<code>eval.py:71</code>); record β and depth in the README results table.</li>
+  <li><strong>Delete dead constants</strong> (<code>CALIBRATION_FILE</code>, <code>SEEDS_FILE</code>,
+  <code>rollout_truncation</code>, …) or implement what they promise; refresh the stale
+  &ldquo;frozen schema&rdquo; comments in <code>stress_sweep.py</code>.</li>
+  <li><strong>Add the missing tests</strong> (an afternoon&rsquo;s work): <code>f</code> conservation
+  and clipping; <code>g</code> closed-form window sums; effective-window/green logic;
+  self-rolled Wilcoxon/JT against known values; <code>Settings</code> validators; checkpoint
+  round-trip. Wire into a 2-minute CI job.</li>
+  <li><strong>Surface the rollout_1s negative result</strong> in the README findings table — it
+  strengthens, not weakens, the credibility of the multi-step claim.</li>
+</ol>
+</div>
+
+<div class="lvl l2">
+<h3>Level 2 — medium-effort scientific strengthening (weeks)</h3>
+<ol>
+  <li><strong>Fix the statistics&rsquo; correlation structure.</strong> Analyze per model seed and
+  aggregate with a mixed-effects model (or report per-seed Wilcoxon + a meta-combined p), instead of
+  pooling 3×30 correlated pairs into &ldquo;n = 90&rdquo;. Train a third (and fourth) 500-ep seed so
+  both regimes have ≥3 independent priors.</li>
+  <li><strong>Depth and β ablations.</strong> Sweep depth ∈ {1, 2, 3, 5} and β ∈ {0, 0.5, 1} across
+  demand levels; β = 0 isolates &ldquo;pure model-predictive greedy&rdquo; from &ldquo;DQN tail
+  matters&rdquo; — currently the single most important missing ablation, because it tests whether the
+  <em>learned</em> component contributes anything at D = 2000 or whether f/g lookahead alone
+  explains the robustness win.</li>
+  <li><strong>Stronger baselines.</strong> Add Webster-timed fixed control, SUMO&rsquo;s built-in
+  actuated logic, and max-pressure (trivially implementable on the existing 12-D state and
+  <code>SERVED_LANES</code>). The greedy-g controller is close to max-pressure already — make the
+  comparison explicit and cite it.</li>
+  <li><strong>Demand-shape generalization.</strong> Evaluate under asymmetric arms (e.g. 70/30
+  N-S/E-W), two-peak profiles, and turn-ratio shifts — all reachable by parameterizing
+  <code>generate_routefile</code>. Volume-only shift is the easiest kind; shape shift is where the
+  &ldquo;physics shield&rdquo; claim gets a real test.</li>
+  <li><strong>Add u_prev to the Q-network input</strong> (13-D or 12+4 one-hot) and re-train; either
+  the results are robust (good — say so) or the aliasing mattered (better — a finding).</li>
+  <li><strong>Commit an f-calibration study</strong>: predicted-vs-realized scatter, per-lane bias,
+  and the effect of saturation-flow error on the action <em>ranking</em> — turning the ρ ≈ 0.54
+  footnote into a &ldquo;how good must f be?&rdquo; sensitivity result.</li>
+  <li><strong>Unify the two CSV schemas</strong> and re-run the nominal benchmarks so throughput /
+  residual guards cover the 100-ep and 500-ep claims too.</li>
+</ol>
+</div>
+
+<div class="lvl l3">
+<h3>Level 3 — major research upgrade (months)</h3>
+<ol>
+  <li><strong>Pick one thesis-grade question and scale it.</strong> The strongest candidate is the
+  robustness story: &ldquo;online physics-grounded lookahead as a certified safety net for learned
+  signal controllers under distribution shift.&rdquo; That framing supports: multiple junction
+  geometries, a demand-shift taxonomy (volume / asymmetry / composition / incidents), and
+  uncertainty-aware rollout budgeting (invoke search only when the DQN&rsquo;s value ensemble
+  disagrees — directly monetizing the 9.5× latency cost the repo already measured).</li>
+  <li><strong>Multi-intersection extension</strong> (already on the README roadmap): an arterial of
+  2–4 signals with a per-junction rollout and shared f. This forces the refactor in §7.2 (network
+  description object instead of module constants) and is where the method could differentiate from
+  single-junction max-pressure.</li>
+  <li><strong>Learned-residual f.</strong> Fit a small correction model on the already-logged
+  residuals (the hooks exist: <code>agent.log_residual</code>) to push rank correlation past the
+  ≈0.54 ceiling, with an ablation isolating its contribution.</li>
+  <li><strong>Rollout in the training loop</strong> (approximate policy iteration): use rollout as
+  the behavior policy or target-improvement operator and compare against frozen-prior rollout —
+  connecting the project to the modern search-amortization literature it implicitly invokes.</li>
+  <li><strong>Position against published TSC-RL baselines</strong> (max-pressure variants,
+  PressLight/MPLight-class methods) on a standard scenario set, or explicitly scope the paper as a
+  controlled mechanism study and defend that choice in the introduction.</li>
+</ol>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="risks">10 · Main Risks</h2>
+
+<table>
+  <thead><tr><th style="width:18%">Category</th><th>Risk</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Scientific</strong></td><td>
+      (1) The D = 2000 headline may be partly an artifact of the 100 m observation zone: under
+      saturation the DQN&rsquo;s state is truncated exactly when decisions matter most, so the
+      &ldquo;value-error&rdquo; being corrected may be substantially <em>observation</em> error —
+      the β = 0 ablation would disambiguate and is currently missing.
+      (2) The +1.12% sample-efficiency effect may not survive correlation-corrected statistics.
+      (3) Volume-only shift may overstate f&rsquo;s &ldquo;off-distribution validity&rdquo;; a
+      shape-shifted demand could break the constant-λ lookahead assumption.
+    </td></tr>
+    <tr><td><strong>Engineering</strong></td><td>
+      No tests around the analytic core or the self-rolled statistics; duplicated dispatch and the
+      copy-pasted <code>_simulate</code> override are drift-prone; single-intersection constants
+      block the roadmap&rsquo;s own MARL extension.
+    </td></tr>
+    <tr><td><strong>Reproducibility</strong></td><td>
+      Checkpoints, deck, docs, and intermediate summaries are gitignored — a fresh clone can verify
+      committed CSVs (strong) but cannot regenerate them without retraining (weak). The headline
+      depth lives in a code fallback, not config. <code>sweep_plan.json</code> records paths
+      (<code>model_long/…</code>) that don&rsquo;t match the documented layout, so the exact
+      provenance of the stress checkpoints is not fully traceable from the repo.
+    </td></tr>
+    <tr><td><strong>Interpretation</strong></td><td>
+      Readers will over-read three things unless warned: the −43% vs fixed-time number (untuned
+      baseline), &ldquo;rollout&rdquo; meaning the one-step f/g formula (headline evidence is
+      depth-3 with a greedy base), and &ldquo;robustness&rdquo; meaning general distribution shift
+      (only demand volume was shifted). Latency (9.5×/decision) is honestly measured but the
+      real-time feasibility argument (4 ms ≪ 10 s decision period) is left implicit.
+    </td></tr>
+  </tbody>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="verdict">11 · Final Verdict</h2>
+
+<div class="callout info">
+  <span class="tag">Classification</span>
+  <strong>C — serious research prototype</strong>, at the upper end of that band. It is clearly
+  more than an engineering demo: there is a stated hypothesis, a controlled paired design,
+  pre-registered-style guards against the obvious confounds, honest negative results, and a
+  self-auditing analysis pipeline that reproduces from committed data (41/41). It is not yet
+  near-paper-ready (D): the mechanism is textbook, the scope is one symmetric junction with one
+  demand shape, the statistics pseudo-replicate, the converged condition has two seeds, and the
+  decisive β = 0 / depth ablations that would pin down <em>why</em> rollout wins under saturation
+  are absent.
+</div>
+
+<p><strong>To reach D (near-paper-ready):</strong> fix the correlation structure of the tests and
+add a third+ converged seed (§9 L2.1); run the β and depth ablations to separate the physics
+lookahead&rsquo;s contribution from the learned tail&rsquo;s (§9 L2.2); add max-pressure and
+actuated baselines (§9 L2.3); demonstrate at least one non-volume demand shift (§9 L2.4); commit
+checkpoints and training curves so every claim is regenerable; and reposition the contribution
+honestly as a controlled mechanism study of test-time search in signal control, citing the rollout
+/ ADP lineage explicitly. With those six items this becomes a defensible workshop-to-conference
+submission; the writing, statistics infrastructure, and demo assets are already ahead of that bar.</p>
+
+<footer>
+  Independent review generated 2026-07-02 · Evidence basis: static inspection of all tracked source
+  files, committed CSV/JSON artifacts, and one re-execution of <code>validate_chapter8.py</code>
+  (offline, numpy-only). Model checkpoints, <code>deck/</code>, <code>docs/</code>, and
+  <code>academic_artifacts/</code> were not inspectable (gitignored / absent from checkout).
+</footer>
+
+</main>
+</body>
+</html>
